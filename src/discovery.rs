@@ -9,7 +9,8 @@
 //! under an 8-second budget.
 
 use agent_client_protocol::schema::v1::{
-    SessionConfigOption, SessionConfigSelectOption, SessionConfigSelectOptions,
+    SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelectOption,
+    SessionConfigSelectOptions,
 };
 use std::path::Path;
 use std::time::Duration;
@@ -32,7 +33,7 @@ pub fn discover_model_options(cwd: &Path) -> Result<Vec<SessionConfigOption>, St
 }
 
 async fn discover_inner(cwd: &Path) -> Result<Vec<SessionConfigOption>, String> {
-    let mut rpc = spawn(cwd, None, &[])?;
+    let rpc = spawn(cwd, None, true, &[])?;
 
     let models = rpc.get_available_models().await?;
     let state = rpc.get_state().await.ok();
@@ -45,8 +46,7 @@ async fn discover_inner(cwd: &Path) -> Result<Vec<SessionConfigOption>, String> 
             .to_string());
     }
 
-    let config_options = build_session_config_options(&models, state.as_ref());
-    Ok(config_options)
+    Ok(build_session_config_options(&models, state.as_ref()))
 }
 
 /// Build the full set of session config options from Pi models and state.
@@ -91,15 +91,11 @@ pub fn build_model_option(models: &[PiModel], current_model_id: &str) -> Session
             }
             let description = description.trim().to_string();
 
-            SessionConfigSelectOption {
-                value: m.acp_model_id(),
-                name: label,
-                description: if description.is_empty() {
-                    None
-                } else {
-                    Some(description)
-                },
+            let mut opt = SessionConfigSelectOption::new(m.acp_model_id(), label);
+            if !description.is_empty() {
+                opt = opt.description(description);
             }
+            opt
         })
         .collect();
 
@@ -109,19 +105,14 @@ pub fn build_model_option(models: &[PiModel], current_model_id: &str) -> Session
         models[0].acp_model_id()
     };
 
-    SessionConfigOption {
-        id: "model".into(),
-        name: "Model".into(),
-        description: Some("Select the model before starting the session".into()),
-        category: Some("model".into()),
-        kind: agent_client_protocol::schema::v1::SessionConfigKind::Select(
-            agent_client_protocol::schema::v1::SessionConfigSelect {
-                current_value: current_value.into(),
-                options: SessionConfigSelectOptions::Ungrouped(choices),
-            },
-        ),
-        meta: None,
-    }
+    SessionConfigOption::select(
+        "model",
+        "Model",
+        current_value,
+        SessionConfigSelectOptions::Ungrouped(choices),
+    )
+    .description("Select the model before starting the session")
+    .category(SessionConfigOptionCategory::Model)
 }
 
 /// Build the `thinking` select option if models expose thinking levels.
@@ -163,26 +154,19 @@ pub fn build_thinking_option(
 
     let choices: Vec<SessionConfigSelectOption> = all_levels
         .iter()
-        .map(|level| SessionConfigSelectOption {
-            value: level.clone(),
-            name: capitalize(level),
-            description: None,
-        })
+        .map(|level| SessionConfigSelectOption::new(level.clone(), capitalize(level)))
         .collect();
 
-    Some(SessionConfigOption {
-        id: "thinking".into(),
-        name: "Thinking Level".into(),
-        description: Some("Select the thinking/reasoning effort level".into()),
-        category: Some("thinking".into()),
-        kind: agent_client_protocol::schema::v1::SessionConfigKind::Select(
-            agent_client_protocol::schema::v1::SessionConfigSelect {
-                current_value: current_level.into(),
-                options: SessionConfigSelectOptions::Ungrouped(choices),
-            },
-        ),
-        meta: None,
-    })
+    Some(
+        SessionConfigOption::select(
+            "thinking",
+            "Thinking Level",
+            current_level,
+            SessionConfigSelectOptions::Ungrouped(choices),
+        )
+        .description("Select the thinking/reasoning effort level")
+        .category(SessionConfigOptionCategory::ThoughtLevel),
+    )
 }
 
 fn capitalize(s: &str) -> String {
@@ -226,15 +210,15 @@ mod tests {
         let models = sample_models();
         let option = build_model_option(&models, "openai-codex/gpt-5.6-luna");
         assert_eq!(&*option.id.0, "model");
-        assert_eq!(option.category.as_deref(), Some("model"));
+        assert_eq!(option.category, Some(SessionConfigOptionCategory::Model));
 
         if let agent_client_protocol::schema::v1::SessionConfigKind::Select(select) = &option.kind {
             assert_eq!(&*select.current_value.0, "openai-codex/gpt-5.6-luna");
             if let SessionConfigSelectOptions::Ungrouped(choices) = &select.options {
                 assert_eq!(choices.len(), 2);
-                assert_eq!(choices[0].value, "openai-codex/gpt-5.6-luna");
+                assert_eq!(&*choices[0].value.0, "openai-codex/gpt-5.6-luna");
                 assert_eq!(choices[0].name, "openai-codex: GPT 5.6 Luna");
-                assert_eq!(choices[1].value, "anthropic/claude-sonnet-4");
+                assert_eq!(&*choices[1].value.0, "anthropic/claude-sonnet-4");
             } else {
                 panic!("expected ungrouped options");
             }
@@ -262,7 +246,7 @@ mod tests {
 
         if let agent_client_protocol::schema::v1::SessionConfigKind::Select(select) = &option.kind {
             if let SessionConfigSelectOptions::Ungrouped(choices) = &select.options {
-                let values: Vec<&str> = choices.iter().map(|c| c.value.as_str()).collect();
+                let values: Vec<&str> = choices.iter().map(|c| &*c.value.0).collect();
                 assert_eq!(values, vec!["low", "medium", "high", "max"]);
             } else {
                 panic!("expected ungrouped options");

@@ -16,15 +16,26 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex};
 
+/// Pending JSON-RPC requests: id → response sender.
+type PendingRequests = Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Value, String>>>>>;
+
+/// Shared event receiver, taken once by the session event loop.
+type EventReceiver = Arc<Mutex<Option<mpsc::UnboundedReceiver<(String, Value)>>>>;
+
 /// A handle to a running `pi --mode rpc` child process.
+///
+/// Cloneable: all fields are behind `Arc`, so clones share the same
+/// child process, stdin, and pending-request map.
+#[derive(Clone)]
 pub struct PiRpc {
     child: Arc<Mutex<Child>>,
     stdin: Arc<Mutex<ChildStdin>>,
-    next_id: AtomicU64,
+    next_id: Arc<AtomicU64>,
     /// Pending requests: id -> oneshot sender for the response.
-    pending: Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Value, String>>>>>,
+    pending: PendingRequests,
     /// Event channel: receives Pi RPC notifications (method + params).
-    events: mpsc::UnboundedReceiver<(String, Value)>,
+    /// Taken by the session event loop; `None` once consumed.
+    events: EventReceiver,
     /// Shutdown signal.
     shutdown: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
@@ -33,17 +44,27 @@ pub struct PiRpc {
 ///
 /// - `cwd`: working directory for the Pi process.
 /// - `session_id`: optional native session ID to resume (`--session <id>`).
+/// - `discovery`: when true, adds `--no-session --no-approve` for ephemeral
+///   model-discovery processes. Session processes omit these flags so Pi
+///   creates a durable session and emits permission requests.
 /// - `extra_args`: additional arguments passed to pi.
-pub fn spawn(cwd: &std::path::Path, session_id: Option<&str>, extra_args: &[String]) -> Result<PiRpc, String> {
+pub fn spawn(
+    cwd: &std::path::Path,
+    session_id: Option<&str>,
+    discovery: bool,
+    extra_args: &[String],
+) -> Result<PiRpc, String> {
     let pi_cmd = crate::pi_command();
     let mut cmd = Command::new(&pi_cmd);
     cmd.arg("--mode").arg("rpc")
-        .arg("--no-session")
-        .arg("--no-approve")
         .current_dir(cwd)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
+
+    if discovery {
+        cmd.arg("--no-session").arg("--no-approve");
+    }
 
     if let Some(sid) = session_id {
         cmd.arg("--session").arg(sid);
@@ -64,8 +85,7 @@ pub fn spawn(cwd: &std::path::Path, session_id: Option<&str>, extra_args: &[Stri
     let stdin = child.stdin.take().ok_or("pi stdin unavailable")?;
     let stdout = child.stdout.take().ok_or("pi stdout unavailable")?;
 
-    let pending: Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Value, String>>>>> =
-        Arc::new(Mutex::new(HashMap::new()));
+    let pending: PendingRequests = Arc::new(Mutex::new(HashMap::new()));
     let (event_tx, event_rx) = mpsc::unbounded_channel::<(String, Value)>();
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
@@ -81,16 +101,16 @@ pub fn spawn(cwd: &std::path::Path, session_id: Option<&str>, extra_args: &[Stri
     Ok(PiRpc {
         child: Arc::new(Mutex::new(child)),
         stdin: Arc::new(Mutex::new(stdin)),
-        next_id: AtomicU64::new(1),
+        next_id: Arc::new(AtomicU64::new(1)),
         pending,
-        events: event_rx,
+        events: Arc::new(Mutex::new(Some(event_rx))),
         shutdown: Arc::new(Mutex::new(Some(shutdown_tx))),
     })
 }
 
 fn read_loop(
     stdout: ChildStdout,
-    pending: Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Value, String>>>>>,
+    pending: PendingRequests,
     event_tx: mpsc::UnboundedSender<(String, Value)>,
     mut shutdown: oneshot::Receiver<()>,
 ) {
@@ -169,9 +189,20 @@ impl PiRpc {
         }
     }
 
+    /// Take ownership of the event receiver for a background event loop.
+    /// Returns `None` if the receiver was already taken.
+    pub async fn take_events(&self) -> Option<mpsc::UnboundedReceiver<(String, Value)>> {
+        self.events.lock().await.take()
+    }
+
     /// Receive the next Pi RPC event (notification).
-    pub async fn next_event(&mut self) -> Option<(String, Value)> {
-        self.events.recv().await
+    /// Returns `None` if the receiver was taken by `take_events()`.
+    #[allow(dead_code)]
+    pub async fn next_event(&self) -> Option<(String, Value)> {
+        // Take the receiver, recv one event, put it back.
+        let mut guard = self.events.lock().await;
+        let rx = guard.as_mut()?;
+        rx.recv().await
     }
 
     /// Get available models from Pi.
@@ -211,6 +242,7 @@ impl PiRpc {
     }
 
     /// Get session stats (context usage, cost).
+    #[allow(dead_code)]
     pub async fn get_session_stats(&self) -> Result<PiSessionStats, String> {
         let result = self.call("get_session_stats", Value::Null).await?;
         let stats: PiSessionStats = serde_json::from_value(result)
@@ -247,6 +279,7 @@ impl PiRpc {
 
 /// A model available in Pi, as returned by `get_available_models`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PiModel {
     pub id: String,
     pub name: String,
@@ -274,6 +307,7 @@ impl PiModel {
 
 /// Pi state, as returned by `get_state`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PiState {
     #[serde(default)]
     pub model: Option<PiModel>,
@@ -287,6 +321,8 @@ pub struct PiState {
 
 /// Pi session statistics.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct PiSessionStats {
     #[serde(default)]
     pub context_tokens: Option<u64>,
