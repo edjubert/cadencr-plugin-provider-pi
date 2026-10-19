@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "agent": {
+    "id": "pi",
+    "name": "Pi",
+    "version": "0.1.0",
+    "description": "Pi coding agent, bridged to Cadencr through its native RPC mode (pi --mode rpc).",
+    "repository": "https://github.com/edjubert/cadencr-plugin-provider-pi",
+    "website": "https://github.com/badlogic/pi-coding-agent",
+    "authors": ["edjubert"],
+    "license": "Apache-2.0",
+    "icon": "icon.svg"
+  },
+  "installation": {
+    "enabled": true,
+    "executable": {
+      "command": "/ABSOLUTE/PATH/TO/cadencr-plugin-provider-pi/target/release/cadencr-plugin-provider-pi"
+    },
+    "assets": {
+      "directory": "/ABSOLUTE/PATH/TO/cadencr-plugin-provider-pi"
+    }
+  }
+}
