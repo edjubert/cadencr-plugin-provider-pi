@@ -1,5 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em">
-  <title>Pi</title>
-  <circle cx="12" cy="12" r="10" fill="#1a1a2e"/>
-  <text x="12" y="16.5" font-family="monospace" font-size="12" font-weight="bold" fill="#e94560" text-anchor="middle">π</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="1em" height="1em">
+  <title>Cadencr + Pi</title>
+  <circle cx="24" cy="24" r="22" fill="#131416"/>
+  <g fill="#eff0f2">
+    <circle cx="24" cy="9.5" r="1.9"/>
+    <circle cx="31.25" cy="11.44" r="1.9"/>
+    <circle cx="36.56" cy="16.75" r="1.9"/>
+    <circle cx="38.5" cy="24" r="1.9"/>
+    <circle cx="36.56" cy="31.25" r="1.9"/>
+    <circle cx="31.25" cy="36.56" r="1.9"/>
+    <circle cx="24" cy="38.5" r="1.9"/>
+    <circle cx="16.75" cy="36.56" r="1.9"/>
+    <circle cx="11.44" cy="31.25" r="1.9"/>
+    <circle cx="9.5" cy="24" r="1.9"/>
+    <circle cx="11.44" cy="16.75" r="1.9"/>
+    <circle cx="16.75" cy="11.44" r="1.9"/>
+  </g>
+  <path d="M17 17.5 L31 17.5 L31 20 L27.5 20 L27.5 31.5 L25 31.5 L25 20 L23 20 L23 31.5 L20.5 31.5 L20.5 20 L17 20 Z" fill="#2db47d"/>
 </svg>
