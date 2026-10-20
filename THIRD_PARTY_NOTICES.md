@@ -4,8 +4,9 @@
 
 `icon.svg` derives from the Cadencr "Index Dots" mark
 (`packages/brand/src/svg/mark.mjs` in the Cadencr repository): the 12-dot
-ring geometry and the graphite/ink/emerald color tokens are reused, with the
-central core replaced by a pi (π) glyph. The Cadencr mark is licensed
+ring geometry, the emerald core and the graphite/ink/emerald color tokens are
+reused. The size of each ring dot encodes a digit of π (3.14159265358), and a
+pi (π) glyph is knocked out of the core. The Cadencr mark is licensed
 Apache-2.0, the same license as this connector.
 
 Cadencr names and logos remain subject to their respective trademark rights.
