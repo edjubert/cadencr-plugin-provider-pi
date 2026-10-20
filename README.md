@@ -1,6 +1,6 @@
 # cadencr-plugin-provider-pi
 
-Cadencr code-backed provider connector for the [Pi coding agent](https://github.com/badlogic/pi-coding-agent).
+Cadencr code-backed provider connector for the [Pi coding agent](https://github.com/earendil-works/pi).
 
 The connector implements the Cadencr provider executable contract:
 
@@ -28,12 +28,12 @@ The connector and Cadencr never collect, store, or broker Pi credentials.
 
 ```bash
 # Via npm
-npm install -g @badlogic/pi-coding-agent
+npm install -g @earendil-works/pi-coding-agent
 
-# Or see https://github.com/badlogic/pi-coding-agent for other install methods
+# Or see https://github.com/earendil-works/pi for other install methods
 ```
 
-This installs the `pi` binary. The connector spawns `pi --mode rpc`.
+This installs the `pi` binary (Node.js >= 22.19.0 required). The connector spawns `pi --mode rpc`.
 
 ## Build
 
@@ -53,6 +53,19 @@ cargo build --release
 1. Copy `descriptor/pi.json` to `~/.cadencr/settings/providers/pi.json`.
 2. Replace both `/ABSOLUTE/PATH/TO/...` placeholders with this repository's absolute path.
 3. Restart Cadencr. Provider registration is read once at startup; hot reload is not supported.
+
+Cadencr launched from the Finder does not inherit your shell `PATH`, so a
+`pi` installed through a Node version manager (nvm, fnm, ...) is not found.
+Add an `env` block to the descriptor's `installation.executable`:
+
+```json
+"env": {
+  "PATH": "/ABSOLUTE/PATH/TO/node/bin:/opt/homebrew/bin:/usr/bin:/bin",
+  "CADENCR_PI_COMMAND": "/ABSOLUTE/PATH/TO/node/bin/pi"
+}
+```
+
+`PATH` must also contain the `node` that `pi`'s shebang resolves to.
 
 To install from another directory, keep `installation.executable.command`
 pointing at the release binary and `installation.assets.directory` at this

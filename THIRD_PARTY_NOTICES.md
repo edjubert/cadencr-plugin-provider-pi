@@ -16,8 +16,8 @@ endorsement.
 ## Pi
 
 The pi (π) glyph references the Pi coding agent
-(https://github.com/badlogic/pi-coding-agent), an independent open-source
-project by badlogic. This connector is not an official Pi product and does
+(https://github.com/earendil-works/pi), an independent open-source
+project by earendil-works. This connector is not an official Pi product and does
 not imply endorsement. Pi names and logos remain subject to their respective
 trademark rights.
 
