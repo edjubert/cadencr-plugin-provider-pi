@@ -54,10 +54,16 @@ impl PiSession {
         let models = rpc.get_available_models().await?;
         let state = rpc.get_state().await.ok();
 
-        let config_options = crate::discovery::build_session_config_options(&models, state.as_ref());
+        let config_options =
+            crate::discovery::build_session_config_options(&models, state.as_ref());
 
         // Get the native session ID for durable resume.
-        let native_session_id = rpc.get_session_id().await.ok().flatten().unwrap_or_default();
+        let native_session_id = rpc
+            .get_session_id()
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or_default();
         let session_id = if native_session_id.is_empty() {
             uuid_v4()
         } else {
@@ -166,7 +172,8 @@ impl PiSession {
         // Refresh config options from Pi state.
         let models = self.rpc.get_available_models().await?;
         let state = self.rpc.get_state().await.ok();
-        self.config_options = crate::discovery::build_session_config_options(&models, state.as_ref());
+        self.config_options =
+            crate::discovery::build_session_config_options(&models, state.as_ref());
 
         Ok(self.config_options())
     }
@@ -264,7 +271,10 @@ fn translate_pi_event(method: &str, params: &Value) -> Option<Value> {
     match method {
         // Text/thinking message chunks.
         "message" | "message_update" => {
-            let role = params.get("role").and_then(Value::as_str).unwrap_or("assistant");
+            let role = params
+                .get("role")
+                .and_then(Value::as_str)
+                .unwrap_or("assistant");
             let content = params.get("content");
             let text = extract_text(content);
             if text.is_empty() {
@@ -584,7 +594,10 @@ mod tests {
         let update = translate_pi_event("tool_execution_end", &params).unwrap();
         assert_eq!(update["sessionUpdate"], "tool_call_update");
         assert_eq!(update["status"], "completed");
-        assert_eq!(update["content"][0]["content"]["text"], "file1.txt\nfile2.txt");
+        assert_eq!(
+            update["content"][0]["content"]["text"],
+            "file1.txt\nfile2.txt"
+        );
     }
 
     #[test]

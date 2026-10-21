@@ -40,8 +40,7 @@ pub async fn run_acp_server(
     let stdout = Arc::new(Mutex::new(std::io::stdout()));
 
     // Active sessions: sessionId -> PiSession.
-    let sessions: SessionMap =
-        Arc::new(Mutex::new(HashMap::new()));
+    let sessions: SessionMap = Arc::new(Mutex::new(HashMap::new()));
 
     // Pending permission requests from session event loops.
     let pending_permissions: PendingPermissions = Arc::new(Mutex::new(HashMap::new()));
@@ -178,9 +177,14 @@ async fn handle_session_new(
         .and_then(Value::as_str)
         .ok_or((-32602, "session/new requires `cwd`".to_string()))?;
 
-    let session = PiSession::new(cwd, provider_args, stdout.clone(), pending_permissions.clone())
-        .await
-        .map_err(|e| (-32000, e))?;
+    let session = PiSession::new(
+        cwd,
+        provider_args,
+        stdout.clone(),
+        pending_permissions.clone(),
+    )
+    .await
+    .map_err(|e| (-32000, e))?;
 
     let session_id = session.session_id().to_string();
     let config_options = session.config_options();
@@ -196,10 +200,7 @@ async fn handle_session_new(
     }))
 }
 
-async fn handle_session_prompt(
-    params: &Value,
-    sessions: &SessionMap,
-) -> AcpResult {
+async fn handle_session_prompt(params: &Value, sessions: &SessionMap) -> AcpResult {
     let session_id = params
         .pointer("/sessionId")
         .and_then(Value::as_str)
@@ -224,7 +225,10 @@ async fn handle_session_prompt(
     }
 
     if text.is_empty() {
-        return Err((-32602, "session/prompt requires at least one text part".to_string()));
+        return Err((
+            -32602,
+            "session/prompt requires at least one text part".to_string(),
+        ));
     }
 
     // Clone the session Arc and release the sessions lock before waiting.
@@ -250,10 +254,7 @@ async fn handle_session_prompt(
     Ok(json!({ "stopReason": stop_reason }))
 }
 
-async fn handle_session_cancel(
-    params: &Value,
-    sessions: &SessionMap,
-) -> AcpResult {
+async fn handle_session_cancel(params: &Value, sessions: &SessionMap) -> AcpResult {
     let session_id = params
         .pointer("/sessionId")
         .and_then(Value::as_str)
@@ -264,29 +265,34 @@ async fn handle_session_cancel(
         .get(session_id)
         .ok_or((-32602, format!("unknown session: {session_id}")))?;
 
-    session.lock().await.cancel().await.map_err(|e| (-32000, e))?;
+    session
+        .lock()
+        .await
+        .cancel()
+        .await
+        .map_err(|e| (-32000, e))?;
 
     Ok(Value::Null)
 }
 
-async fn handle_set_config_option(
-    params: &Value,
-    sessions: &SessionMap,
-) -> AcpResult {
+async fn handle_set_config_option(params: &Value, sessions: &SessionMap) -> AcpResult {
     let session_id = params
         .pointer("/sessionId")
         .and_then(Value::as_str)
-        .ok_or((-32602, "session/set_config_option requires `sessionId`".to_string()))?;
+        .ok_or((
+            -32602,
+            "session/set_config_option requires `sessionId`".to_string(),
+        ))?;
 
-    let config_id = params
-        .pointer("/configId")
-        .and_then(Value::as_str)
-        .ok_or((-32602, "session/set_config_option requires `configId`".to_string()))?;
+    let config_id = params.pointer("/configId").and_then(Value::as_str).ok_or((
+        -32602,
+        "session/set_config_option requires `configId`".to_string(),
+    ))?;
 
-    let value = params
-        .pointer("/value")
-        .and_then(Value::as_str)
-        .ok_or((-32602, "session/set_config_option requires `value`".to_string()))?;
+    let value = params.pointer("/value").and_then(Value::as_str).ok_or((
+        -32602,
+        "session/set_config_option requires `value`".to_string(),
+    ))?;
 
     let sessions = sessions.lock().await;
     let session = sessions
@@ -343,10 +349,7 @@ async fn handle_session_resume(
     }))
 }
 
-async fn handle_session_close(
-    params: &Value,
-    sessions: &SessionMap,
-) -> AcpResult {
+async fn handle_session_close(params: &Value, sessions: &SessionMap) -> AcpResult {
     let session_id = params
         .pointer("/sessionId")
         .and_then(Value::as_str)

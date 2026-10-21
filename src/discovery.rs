@@ -27,7 +27,8 @@ pub fn discover_model_options(cwd: &Path) -> Result<Vec<SessionConfigOption>, St
         .map_err(|e| format!("failed to create runtime: {e}"))?;
 
     runtime.block_on(async {
-        tokio::time::timeout(DISCOVERY_TIMEOUT, discover_inner(cwd)).await
+        tokio::time::timeout(DISCOVERY_TIMEOUT, discover_inner(cwd))
+            .await
             .map_err(|_| "pi model discovery timed out after 8 seconds".to_string())?
     })
 }
@@ -41,9 +42,11 @@ async fn discover_inner(cwd: &Path) -> Result<Vec<SessionConfigOption>, String> 
     rpc.shutdown().await;
 
     if models.is_empty() {
-        return Err("pi returned no available models. Check your Pi configuration \
+        return Err(
+            "pi returned no available models. Check your Pi configuration \
              and provider credentials (~/.pi/agent/settings.json)."
-            .to_string());
+                .to_string(),
+        );
     }
 
     Ok(build_session_config_options(&models, state.as_ref()))
