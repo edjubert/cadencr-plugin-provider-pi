@@ -21,6 +21,7 @@ mod discovery;
 mod pi_rpc;
 mod session;
 mod translate;
+mod ui_bridge;
 
 const MODEL_DISCOVERY_FORMAT: &str = "acp-config-options-v1";
 const ACP_V1_PROTOCOL: &str = "acp-v1";
