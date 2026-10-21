@@ -5,7 +5,7 @@
 //! other line is an event `{"type":...}` forwarded as `(type, full object)`.
 //! See `docs/rpc.md` in the `@earendil-works/pi-coding-agent` package.
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -253,16 +253,6 @@ impl PiRpc {
         self.events.lock().await.take()
     }
 
-    /// Receive the next Pi RPC event (notification).
-    /// Returns `None` if the receiver was taken by `take_events()`.
-    #[allow(dead_code)]
-    pub async fn next_event(&self) -> Option<(String, Value)> {
-        // Take the receiver, recv one event, put it back.
-        let mut guard = self.events.lock().await;
-        let rx = guard.as_mut()?;
-        rx.recv().await
-    }
-
     /// Get available models from Pi.
     pub async fn get_available_models(&self) -> Result<Vec<PiModel>, String> {
         parse_models(&self.call("get_available_models", Value::Null).await?)
@@ -309,31 +299,9 @@ impl PiRpc {
         self.call("abort", Value::Null).await
     }
 
-    /// Get session stats (context usage, cost).
-    #[allow(dead_code)]
-    pub async fn get_session_stats(&self) -> Result<PiSessionStats, String> {
-        let result = self.call("get_session_stats", Value::Null).await?;
-        let stats: PiSessionStats = serde_json::from_value(result)
-            .map_err(|e| format!("failed to parse pi session stats: {e}"))?;
-        Ok(stats)
-    }
-
     /// Get the native session ID (for durable resume).
     pub async fn get_session_id(&self) -> Result<Option<String>, String> {
         Ok(self.get_state().await?.session_id)
-    }
-
-    /// Legacy shim, removed in task 7: maps the old allow/deny decision to a
-    /// `confirm` response.
-    pub async fn respond_permission(
-        &self,
-        request_id: &str,
-        decision: &str,
-    ) -> Result<Value, String> {
-        let confirmed = decision.starts_with("allow");
-        self.respond_ui(request_id, json!({ "confirmed": confirmed }))
-            .await?;
-        Ok(Value::Null)
     }
 
     /// Gracefully shut down the Pi child process.
@@ -415,21 +383,6 @@ pub struct PiState {
     #[serde(default)]
     #[allow(dead_code)]
     pub session_name: Option<String>,
-}
-
-/// Pi session statistics.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-pub struct PiSessionStats {
-    #[serde(default)]
-    pub context_tokens: Option<u64>,
-    #[serde(default)]
-    pub max_context_tokens: Option<u64>,
-    #[serde(default)]
-    pub cost_usd: Option<f64>,
-    #[serde(default)]
-    pub message_count: Option<u64>,
 }
 
 #[cfg(test)]

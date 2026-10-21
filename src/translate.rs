@@ -1,6 +1,4 @@
 //! Pure translation of Pi RPC events into ACP `session/update` payloads.
-#![allow(dead_code)] // removed in task 5
-
 use serde_json::{json, Value};
 
 /// Translate one Pi event (`type` + full object) into zero or more ACP
