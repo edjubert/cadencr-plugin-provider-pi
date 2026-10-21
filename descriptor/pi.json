@@ -9,7 +9,7 @@
     "website": "https://github.com/earendil-works/pi",
     "authors": ["edjubert"],
     "license": "Apache-2.0",
-    "icon": "icon.svg"
+    "icon": "pi-logo.svg"
   },
   "installation": {
     "enabled": true,

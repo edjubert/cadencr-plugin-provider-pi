@@ -1,5 +1,7 @@
 # cadencr-plugin-provider-pi
 
+![Cadencr + Pi](icon.svg)
+
 Cadencr code-backed provider connector for the [Pi coding agent](https://github.com/earendil-works/pi).
 
 The connector implements the Cadencr provider executable contract:
@@ -69,7 +71,8 @@ Add an `env` block to the descriptor's `installation.executable`:
 
 To install from another directory, keep `installation.executable.command`
 pointing at the release binary and `installation.assets.directory` at this
-repository root (the directory that holds `icon.svg`).
+repository root. It contains `pi-logo.svg` for Cadencr and `icon.svg` for this
+README.
 
 ### Cadencr development checkout
 
