@@ -1,6 +1,8 @@
 # cadencr-plugin-provider-pi
 
-<img src="icon.svg" alt="Cadencr + Pi" width="128" height="128">
+<p align="center">
+  <img src="icon.svg" alt="Cadencr + Pi" width="128" height="128">
+</p>
 
 > The 12 dots around the logo encode the digits of π (`3.14159265358`).
 > Read clockwise from the green dot at the top: larger dots represent larger digits.
