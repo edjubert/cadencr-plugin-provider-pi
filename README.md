@@ -1,6 +1,9 @@
 # cadencr-plugin-provider-pi
 
-![Cadencr + Pi](icon.svg)
+<img src="icon.svg" alt="Cadencr + Pi" width="128" height="128">
+
+> The 12 dots around the logo encode the digits of π (`3.14159265358`).
+> Read clockwise from the green dot at the top: larger dots represent larger digits.
 
 Cadencr code-backed provider connector for the [Pi coding agent](https://github.com/earendil-works/pi).
 
