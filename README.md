@@ -8,7 +8,7 @@ The connector implements the Cadencr provider executable contract:
 | --- | --- |
 | `version` | Prints the connector version. |
 | `models --format acp-config-options-v1 --cwd <abs>` | Launches `pi --mode rpc --no-session --no-approve` in the workspace, calls `get_available_models` and `get_state`, and prints the ACP v1 `SessionConfigOption` array. |
-| `run --protocol acp-v1` | Starts an ACP v1 JSON-RPC server over stdio. Each ACP session owns a persistent `pi --mode rpc` child process; Pi RPC events are bridged to ACP session updates. |
+| `run --protocol acp-v1` | Starts an ACP v1 JSON-RPC server over stdio. Each ACP session owns a persistent `pi --mode rpc` child process; Pi events are translated to ACP session updates. |
 
 ## Prerequisites
 
@@ -91,19 +91,44 @@ Cadencr host
     │ ACP v1 (stdio JSON-RPC)
     ▼
 cadencr-plugin-provider-pi  (this connector)
-    │ spawns per ACP session
+    │ Pi's JSONL RPC protocol (`pi --mode rpc`)
     ▼
 pi --mode rpc  (native Pi RPC child)
 ```
 
+- Between the connector and Pi, communication uses **Pi's JSONL RPC protocol**
+  (`pi --mode rpc`, see `docs/rpc.md` of `@earendil-works/pi-coding-agent`).
+  This is separate from the ACP JSON-RPC connection between Cadencr and the
+  connector.
 - `models` uses a disposable Pi RPC process to discover available models.
 - `run` starts an ACP v1 server. Each `session/new` spawns a fresh
-  `pi --mode rpc` child. Pi RPC events (message streams, tool calls,
-  permissions, thinking, stats) are translated to ACP `session/update`
-  notifications.
+  `pi --mode rpc` child.
+- Pi `message_update` events with `text_delta` and `thinking_delta` become
+  ACP `agent_message_chunk` and `agent_thought_chunk` updates.
+- `tool_execution_start`, `tool_execution_update`, and `tool_execution_end`
+  become ACP `tool_call` and `tool_call_update` updates.
+- `agent_settled` ends `session/prompt`. Its ACP `stopReason` comes from the
+  last assistant `message_end`: `stop`, `toolUse`, and `error` map to
+  `end_turn`; `length` maps to `max_tokens`; `aborted` maps to `cancelled`.
 - Durable resume: `session/resume` spawns `pi --mode rpc --session <id>`
   to restore the native Pi session context.
 - `session/close` terminates the Pi child process cleanly.
+
+## Permissions
+
+Pi has no tool-approval system; tools run without confirmation. Only extension
+dialogs (`select`, `confirm`) are bridged to ACP
+`session/request_permission`. Unsupported `input` and `editor` dialogs are
+cancelled; notifications and status updates are ignored.
+
+## Known limitations
+
+- Context usage is not reported to ACP.
+- Compaction, fork, clone, steer, and follow-up operations are not supported.
+- The connector has no separate direct bash operation and does not support
+  image input in prompts.
+- `--no-approve` is used for model discovery only. Sessions use Pi's default
+  project-trust behavior.
 
 ## Notes
 
