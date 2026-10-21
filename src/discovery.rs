@@ -15,7 +15,7 @@ use agent_client_protocol::schema::v1::{
 use std::path::Path;
 use std::time::Duration;
 
-use crate::pi_rpc::{spawn, PiModel, PiState};
+use crate::pi_rpc::{spawn, PiModel, PiRpc, PiState};
 
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(8);
 
@@ -27,26 +27,47 @@ pub fn discover_model_options(cwd: &Path) -> Result<Vec<SessionConfigOption>, St
         .map_err(|e| format!("failed to create runtime: {e}"))?;
 
     runtime.block_on(async {
-        tokio::time::timeout(DISCOVERY_TIMEOUT, discover_inner(cwd)).await
+        tokio::time::timeout(DISCOVERY_TIMEOUT, discover_inner(cwd))
+            .await
             .map_err(|_| "pi model discovery timed out after 8 seconds".to_string())?
     })
 }
 
 async fn discover_inner(cwd: &Path) -> Result<Vec<SessionConfigOption>, String> {
     let rpc = spawn(cwd, None, true, &[])?;
-
-    let models = rpc.get_available_models().await?;
-    let state = rpc.get_state().await.ok();
-
+    let options = load_config_options(&rpc).await;
     rpc.shutdown().await;
+    options
+}
 
+/// Query pi for models, state and the current model's thinking levels, and
+/// build the ACP config options. Single source of truth for `models`
+/// discovery and for live `session/new|resume|set_config_option`.
+pub async fn load_config_options(rpc: &PiRpc) -> Result<Vec<SessionConfigOption>, String> {
+    let mut models = rpc.get_available_models().await?;
     if models.is_empty() {
-        return Err("pi returned no available models. Check your Pi configuration \
+        return Err(
+            "pi returned no available models. Check your Pi configuration \
              and provider credentials (~/.pi/agent/settings.json)."
-            .to_string());
+                .to_string(),
+        );
     }
+    let state = rpc.get_state().await?;
+    let levels = rpc.get_available_thinking_levels().await?;
+    apply_thinking_levels(&mut models, &state, levels);
+    Ok(build_session_config_options(&models, Some(&state)))
+}
 
-    Ok(build_session_config_options(&models, state.as_ref()))
+/// Attach the thinking levels to the model they were fetched for (the
+/// current one). Pi only reports levels for the current model.
+fn apply_thinking_levels(models: &mut [PiModel], state: &PiState, levels: Vec<String>) {
+    let current = state.model.as_ref().map(PiModel::acp_model_id);
+    let target = models
+        .iter_mut()
+        .find(|m| Some(m.acp_model_id()) == current);
+    if let Some(model) = target {
+        model.thinking_levels = levels;
+    }
 }
 
 /// Build the full set of session config options from Pi models and state.
@@ -120,21 +141,23 @@ pub fn build_thinking_option(
     models: &[PiModel],
     state: Option<&PiState>,
 ) -> Option<SessionConfigOption> {
-    // Collect the union of all thinking levels across models.
-    let mut all_levels: Vec<String> = Vec::new();
-    for model in models {
-        for level in &model.thinking_levels {
-            if !all_levels.contains(level) {
-                all_levels.push(level.clone());
-            }
-        }
-    }
+    // Use the thinking levels of the current model (Pi only reports levels
+    // for the current model). Fall back to the first model when no state.
+    let current_id = state
+        .and_then(|s| s.model.as_ref())
+        .map(PiModel::acp_model_id)
+        .or_else(|| models.first().map(PiModel::acp_model_id))?;
+    let mut all_levels: Vec<String> = models
+        .iter()
+        .find(|m| m.acp_model_id() == current_id)
+        .map(|m| m.thinking_levels.clone())
+        .unwrap_or_default();
     if all_levels.len() < 2 {
         return None;
     }
 
     // Sort levels in a sensible order.
-    let level_order = ["off", "minimal", "low", "medium", "high", "max", "xhigh"];
+    let level_order = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
     all_levels.sort_by_key(|lvl| {
         level_order
             .iter()
@@ -239,21 +262,28 @@ mod tests {
     }
 
     #[test]
-    fn builds_thinking_option_with_union_of_levels() {
-        let models = sample_models();
-        let option = build_thinking_option(&models, None).expect("thinking option expected");
-        assert_eq!(&*option.id.0, "thinking");
-
-        if let agent_client_protocol::schema::v1::SessionConfigKind::Select(select) = &option.kind {
-            if let SessionConfigSelectOptions::Ungrouped(choices) = &select.options {
-                let values: Vec<&str> = choices.iter().map(|c| &*c.value.0).collect();
-                assert_eq!(values, vec!["low", "medium", "high", "max"]);
-            } else {
-                panic!("expected ungrouped options");
-            }
-        } else {
-            panic!("expected select kind");
-        }
+    fn thinking_option_uses_current_model_levels_only() {
+        let mut models = sample_models();
+        let current = models[0].acp_model_id();
+        models[0].thinking_levels = vec!["off".into(), "low".into(), "high".into()];
+        models[1].thinking_levels = vec!["off".into(), "max".into()];
+        let state = PiState {
+            model: Some(models[0].clone()),
+            thinking_level: Some("low".to_string()),
+            session_id: None,
+            session_name: None,
+        };
+        let option = build_thinking_option(&models, Some(&state)).expect("thinking option");
+        let json = serde_json::to_value(&option).unwrap();
+        let values: Vec<&str> = json["options"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|o| o["value"].as_str().unwrap())
+            .collect();
+        assert_eq!(values, vec!["off", "low", "high"]);
+        assert_eq!(json["currentValue"], "low");
+        assert_eq!(models[0].acp_model_id(), current);
     }
 
     #[test]
@@ -262,12 +292,29 @@ mod tests {
             id: "model-a".to_string(),
             name: "Model A".to_string(),
             provider: Some("test".to_string()),
-            thinking_levels: vec!["medium".into()],
+            thinking_levels: vec!["off".into()],
             default_thinking_level: None,
             supports_images: false,
             max_context: None,
         }];
         assert!(build_thinking_option(&models, None).is_none());
+    }
+
+    #[test]
+    fn apply_thinking_levels_targets_the_current_model() {
+        let mut models = sample_models();
+        // The non-current model starts with no levels so we can assert it is
+        // left untouched.
+        models[0].thinking_levels = vec![];
+        let state = PiState {
+            model: Some(models[1].clone()),
+            thinking_level: None,
+            session_id: None,
+            session_name: None,
+        };
+        apply_thinking_levels(&mut models, &state, vec!["off".into(), "high".into()]);
+        assert!(models[0].thinking_levels.is_empty());
+        assert_eq!(models[1].thinking_levels, vec!["off", "high"]);
     }
 
     #[test]

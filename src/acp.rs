@@ -40,8 +40,7 @@ pub async fn run_acp_server(
     let stdout = Arc::new(Mutex::new(std::io::stdout()));
 
     // Active sessions: sessionId -> PiSession.
-    let sessions: SessionMap =
-        Arc::new(Mutex::new(HashMap::new()));
+    let sessions: SessionMap = Arc::new(Mutex::new(HashMap::new()));
 
     // Pending permission requests from session event loops.
     let pending_permissions: PendingPermissions = Arc::new(Mutex::new(HashMap::new()));
@@ -77,6 +76,30 @@ pub async fn run_acp_server(
 
         let Some(method) = method else { continue };
 
+        // `session/prompt` waits for the whole turn: run it on its own task so this
+        // loop keeps reading `session/cancel` and permission responses.
+        if method == "session/prompt" {
+            let sessions = sessions.clone();
+            let stdout = stdout.clone();
+            let provider_args = provider_args.clone();
+            let pending_permissions = pending_permissions.clone();
+            tokio::spawn(async move {
+                let response = handle_request(
+                    &method,
+                    &params,
+                    &sessions,
+                    &stdout,
+                    &provider_args,
+                    &pending_permissions,
+                )
+                .await;
+                if let Some(req_id) = id {
+                    write_response(&stdout, &req_id, response).await;
+                }
+            });
+            continue;
+        }
+
         let response = handle_request(
             &method,
             &params,
@@ -88,21 +111,7 @@ pub async fn run_acp_server(
         .await;
 
         if let Some(req_id) = id {
-            let mut out = stdout.lock().await;
-            let resp = match response {
-                Ok(result) => json!({
-                    "jsonrpc": "2.0",
-                    "id": req_id,
-                    "result": result,
-                }),
-                Err((code, message)) => json!({
-                    "jsonrpc": "2.0",
-                    "id": req_id,
-                    "error": { "code": code, "message": message },
-                }),
-            };
-            let _ = writeln!(out, "{resp}");
-            let _ = out.flush();
+            write_response(&stdout, &req_id, response).await;
         }
     }
 
@@ -116,6 +125,26 @@ pub async fn run_acp_server(
 }
 
 type AcpResult = Result<Value, (i64, String)>;
+
+/// Build a JSON-RPC response object.
+fn jsonrpc_response(id: &Value, response: AcpResult) -> Value {
+    match response {
+        Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
+        Err((code, message)) => json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": { "code": code, "message": message },
+        }),
+    }
+}
+
+async fn write_response(stdout: &Arc<Mutex<std::io::Stdout>>, id: &Value, response: AcpResult) {
+    let line = jsonrpc_response(id, response);
+    let mut out = stdout.lock().await;
+    if let Err(e) = writeln!(out, "{line}").and_then(|_| out.flush()) {
+        eprintln!("acp: failed to write response: {e}");
+    }
+}
 
 #[allow(clippy::too_many_arguments)]
 async fn handle_request(
@@ -178,9 +207,14 @@ async fn handle_session_new(
         .and_then(Value::as_str)
         .ok_or((-32602, "session/new requires `cwd`".to_string()))?;
 
-    let session = PiSession::new(cwd, provider_args, stdout.clone(), pending_permissions.clone())
-        .await
-        .map_err(|e| (-32000, e))?;
+    let session = PiSession::new(
+        cwd,
+        provider_args,
+        stdout.clone(),
+        pending_permissions.clone(),
+    )
+    .await
+    .map_err(|e| (-32000, e))?;
 
     let session_id = session.session_id().to_string();
     let config_options = session.config_options();
@@ -196,10 +230,7 @@ async fn handle_session_new(
     }))
 }
 
-async fn handle_session_prompt(
-    params: &Value,
-    sessions: &SessionMap,
-) -> AcpResult {
+async fn handle_session_prompt(params: &Value, sessions: &SessionMap) -> AcpResult {
     let session_id = params
         .pointer("/sessionId")
         .and_then(Value::as_str)
@@ -224,7 +255,10 @@ async fn handle_session_prompt(
     }
 
     if text.is_empty() {
-        return Err((-32602, "session/prompt requires at least one text part".to_string()));
+        return Err((
+            -32602,
+            "session/prompt requires at least one text part".to_string(),
+        ));
     }
 
     // Clone the session Arc and release the sessions lock before waiting.
@@ -245,15 +279,14 @@ async fn handle_session_prompt(
         .map_err(|e| (-32000, e))?;
 
     // Wait for the turn to complete (event loop resolves the receiver).
-    let stop_reason = turn_end_rx.await.unwrap_or_else(|_| "end_turn".to_string());
+    let stop_reason = turn_end_rx
+        .await
+        .map_err(|_| (-32000, "pi exited before the turn finished".to_string()))?;
 
     Ok(json!({ "stopReason": stop_reason }))
 }
 
-async fn handle_session_cancel(
-    params: &Value,
-    sessions: &SessionMap,
-) -> AcpResult {
+async fn handle_session_cancel(params: &Value, sessions: &SessionMap) -> AcpResult {
     let session_id = params
         .pointer("/sessionId")
         .and_then(Value::as_str)
@@ -264,29 +297,34 @@ async fn handle_session_cancel(
         .get(session_id)
         .ok_or((-32602, format!("unknown session: {session_id}")))?;
 
-    session.lock().await.cancel().await.map_err(|e| (-32000, e))?;
+    session
+        .lock()
+        .await
+        .cancel()
+        .await
+        .map_err(|e| (-32000, e))?;
 
     Ok(Value::Null)
 }
 
-async fn handle_set_config_option(
-    params: &Value,
-    sessions: &SessionMap,
-) -> AcpResult {
+async fn handle_set_config_option(params: &Value, sessions: &SessionMap) -> AcpResult {
     let session_id = params
         .pointer("/sessionId")
         .and_then(Value::as_str)
-        .ok_or((-32602, "session/set_config_option requires `sessionId`".to_string()))?;
+        .ok_or((
+            -32602,
+            "session/set_config_option requires `sessionId`".to_string(),
+        ))?;
 
-    let config_id = params
-        .pointer("/configId")
-        .and_then(Value::as_str)
-        .ok_or((-32602, "session/set_config_option requires `configId`".to_string()))?;
+    let config_id = params.pointer("/configId").and_then(Value::as_str).ok_or((
+        -32602,
+        "session/set_config_option requires `configId`".to_string(),
+    ))?;
 
-    let value = params
-        .pointer("/value")
-        .and_then(Value::as_str)
-        .ok_or((-32602, "session/set_config_option requires `value`".to_string()))?;
+    let value = params.pointer("/value").and_then(Value::as_str).ok_or((
+        -32602,
+        "session/set_config_option requires `value`".to_string(),
+    ))?;
 
     let sessions = sessions.lock().await;
     let session = sessions
@@ -343,10 +381,7 @@ async fn handle_session_resume(
     }))
 }
 
-async fn handle_session_close(
-    params: &Value,
-    sessions: &SessionMap,
-) -> AcpResult {
+async fn handle_session_close(params: &Value, sessions: &SessionMap) -> AcpResult {
     let session_id = params
         .pointer("/sessionId")
         .and_then(Value::as_str)
@@ -358,4 +393,20 @@ async fn handle_session_close(
     }
 
     Ok(Value::Null)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn jsonrpc_response_shapes() {
+        let ok = jsonrpc_response(&json!(3), Ok(json!({ "stopReason": "end_turn" })));
+        assert_eq!(ok["result"]["stopReason"], "end_turn");
+        assert_eq!(ok["id"], 3);
+        let err = jsonrpc_response(&json!("a"), Err((-32000, "boom".to_string())));
+        assert_eq!(err["error"]["code"], -32000);
+        assert_eq!(err["error"]["message"], "boom");
+        assert!(err.get("result").is_none());
+    }
 }

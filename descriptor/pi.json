@@ -6,10 +6,10 @@
     "version": "0.1.0",
     "description": "Pi coding agent, bridged to Cadencr through its native RPC mode (pi --mode rpc).",
     "repository": "https://github.com/edjubert/cadencr-plugin-provider-pi",
-    "website": "https://github.com/badlogic/pi-coding-agent",
+    "website": "https://github.com/earendil-works/pi",
     "authors": ["edjubert"],
     "license": "Apache-2.0",
-    "icon": "icon.svg"
+    "icon": "pi-logo.svg"
   },
   "installation": {
     "enabled": true,
