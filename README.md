@@ -111,6 +111,9 @@ pi --mode rpc  (native Pi RPC child)
 - `models` uses a disposable Pi RPC process to discover available models.
 - `run` starts an ACP v1 server. Each `session/new` spawns a fresh
   `pi --mode rpc` child.
+- The active model's `contextWindow` is sent to Cadencr as an ACP
+  `usage_update` when the session starts or changes model. Pi's
+  `get_session_stats` context estimate is forwarded when a turn settles.
 - Pi `message_update` events with `text_delta` and `thinking_delta` become
   ACP `agent_message_chunk` and `agent_thought_chunk` updates.
 - `tool_execution_start`, `tool_execution_update`, and `tool_execution_end`
