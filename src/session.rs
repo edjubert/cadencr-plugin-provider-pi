@@ -17,10 +17,13 @@ use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex};
 
 use crate::pi_rpc::{spawn, PiRpc, PiState};
+use crate::session_task::AutoNameTask;
 use crate::translate::{
     assistant_error_text, assistant_stop_reason, map_stop_reason, translate_event,
 };
 use crate::ui_bridge::handle_ui_request;
+
+static NEXT_EPHEMERAL_SESSION_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Shared map of pending permission requests: request ID → response sender.
 /// The ACP server fills this when the event loop asks for a permission decision;
@@ -41,6 +44,7 @@ pub struct PiSession {
     pending_permissions: PendingPermissions,
     /// Counter for generating unique permission request IDs.
     permission_req_id: Arc<AtomicU64>,
+    auto_name: bool,
     /// Background event loop task handle.
     event_task: Option<tokio::task::JoinHandle<()>>,
 }
@@ -50,11 +54,18 @@ impl PiSession {
     pub async fn new(
         cwd: &str,
         provider_args: &[String],
+        auto_name_task: Option<AutoNameTask>,
         stdout: Arc<Mutex<std::io::Stdout>>,
         pending_permissions: PendingPermissions,
     ) -> Result<Self, String> {
         let cwd_path = std::path::Path::new(cwd);
-        let rpc = spawn(cwd_path, None, false, provider_args)?;
+        let auto_name = auto_name_task.is_some();
+        let mut pi_args = provider_args.to_vec();
+        if let Some(task) = auto_name_task {
+            pi_args.extend(task.pi_args());
+        }
+        // Title generation must not leave a durable Pi session behind.
+        let rpc = spawn(cwd_path, None, auto_name, &pi_args)?;
 
         let config_options = match crate::discovery::load_config_options(&rpc).await {
             Ok(options) => options,
@@ -72,6 +83,11 @@ impl PiSession {
         };
         let session_id = match state.session_id.clone() {
             Some(session_id) => session_id,
+            None if auto_name => format!(
+                "cadencr-auto-name-{}-{}",
+                std::process::id(),
+                NEXT_EPHEMERAL_SESSION_ID.fetch_add(1, Ordering::SeqCst)
+            ),
             None => {
                 rpc.shutdown().await;
                 return Err("pi did not report a sessionId (get_state)".to_string());
@@ -90,6 +106,7 @@ impl PiSession {
             turn_end_tx: Arc::new(Mutex::new(None)),
             pending_permissions,
             permission_req_id: Arc::new(AtomicU64::new(1)),
+            auto_name,
             event_task: None,
         })
     }
@@ -139,6 +156,7 @@ impl PiSession {
             turn_end_tx: Arc::new(Mutex::new(None)),
             pending_permissions,
             permission_req_id: Arc::new(AtomicU64::new(1)),
+            auto_name: false,
             event_task: None,
         })
     }
@@ -198,6 +216,9 @@ impl PiSession {
         match config_id {
             "model" => {
                 self.rpc.set_model(value).await?;
+                if self.auto_name {
+                    self.rpc.set_thinking_level("off").await?;
+                }
             }
             "thinking" => {
                 self.rpc.set_thinking_level(value).await?;

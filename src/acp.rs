@@ -12,6 +12,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::session::{PendingPermissions, PiSession};
+use crate::session_task::AutoNameTask;
 
 /// Active sessions: sessionId → PiSession.
 type SessionMap = Arc<Mutex<HashMap<String, Arc<Mutex<PiSession>>>>>;
@@ -230,10 +231,12 @@ async fn handle_session_new(
         .pointer("/cwd")
         .and_then(Value::as_str)
         .ok_or((-32602, "session/new requires `cwd`".to_string()))?;
+    let auto_name_task = AutoNameTask::from_session_params(params);
 
     let session = PiSession::new(
         cwd,
         provider_args,
+        auto_name_task,
         stdout.clone(),
         pending_permissions.clone(),
     )

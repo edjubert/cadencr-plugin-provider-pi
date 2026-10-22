@@ -111,6 +111,14 @@ pi --mode rpc  (native Pi RPC child)
 - `models` uses a disposable Pi RPC process to discover available models.
 - `run` starts an ACP v1 server. Each `session/new` spawns a fresh
   `pi --mode rpc` child.
+- Cadencr title-generation sessions are marked through ACP metadata. The
+  connector starts those Pi children with an ephemeral session, no tools,
+  extensions, skills, prompt templates, themes, or context files, and replaces
+  Pi's default system prompt with Cadencr's naming prompt. An empty
+  append-system-prompt override also prevents Pi from loading global
+  `APPEND_SYSTEM.md` instructions. The marker is
+  `_meta.com.cadencr.purpose: "auto_name"`; `systemPrompt` carries the optional
+  replacement text.
 - The active model's `contextWindow` is sent to Cadencr as an ACP
   `usage_update` when the session starts or changes model. Pi's
   `get_session_stats` context estimate is forwarded when a turn settles.
