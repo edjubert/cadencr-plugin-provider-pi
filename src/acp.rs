@@ -12,6 +12,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::session::{PendingPermissions, PiSession};
+use crate::session_task::AutoNameTask;
 
 /// Active sessions: sessionId → PiSession.
 type SessionMap = Arc<Mutex<HashMap<String, Arc<Mutex<PiSession>>>>>;
@@ -110,8 +111,25 @@ pub async fn run_acp_server(
         )
         .await;
 
+        let session_to_activate = if matches!(
+            method.as_str(),
+            "session/new" | "session/resume" | "session/load"
+        ) {
+            response
+                .as_ref()
+                .ok()
+                .and_then(|result| result.get("sessionId"))
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        } else {
+            None
+        };
+
         if let Some(req_id) = id {
             write_response(&stdout, &req_id, response).await;
+        }
+        if let Some(session_id) = session_to_activate {
+            activate_session(&sessions, &session_id).await;
         }
     }
 
@@ -143,6 +161,13 @@ async fn write_response(stdout: &Arc<Mutex<std::io::Stdout>>, id: &Value, respon
     let mut out = stdout.lock().await;
     if let Err(e) = writeln!(out, "{line}").and_then(|_| out.flush()) {
         eprintln!("acp: failed to write response: {e}");
+    }
+}
+
+async fn activate_session(sessions: &SessionMap, session_id: &str) {
+    let session = sessions.lock().await.get(session_id).cloned();
+    if let Some(session) = session {
+        session.lock().await.activate().await;
     }
 }
 
@@ -206,10 +231,12 @@ async fn handle_session_new(
         .pointer("/cwd")
         .and_then(Value::as_str)
         .ok_or((-32602, "session/new requires `cwd`".to_string()))?;
+    let auto_name_task = AutoNameTask::from_session_params(params);
 
     let session = PiSession::new(
         cwd,
         provider_args,
+        auto_name_task,
         stdout.clone(),
         pending_permissions.clone(),
     )

@@ -42,14 +42,13 @@ pub struct PiRpc {
 ///
 /// - `cwd`: working directory for the Pi process.
 /// - `session_id`: optional native session ID to resume (`--session <id>`).
-/// - `discovery`: when true, adds `--no-session --no-approve` for ephemeral
-///   model-discovery processes. Session processes omit these flags so Pi
-///   creates a durable session and emits permission requests.
+/// - `ephemeral`: when true, adds `--no-session --no-approve` after the other
+///   arguments so Pi cannot persist or trust project-local resources.
 /// - `extra_args`: additional arguments passed to pi.
 pub fn spawn(
     cwd: &std::path::Path,
     session_id: Option<&str>,
-    discovery: bool,
+    ephemeral: bool,
     extra_args: &[String],
 ) -> Result<PiRpc, String> {
     let pi_cmd = crate::pi_command();
@@ -61,16 +60,15 @@ pub fn spawn(
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
 
-    if discovery {
-        cmd.arg("--no-session").arg("--no-approve");
-    }
-
     if let Some(sid) = session_id {
         cmd.arg("--session").arg(sid);
     }
 
     for arg in extra_args {
         cmd.arg(arg);
+    }
+    if ephemeral {
+        cmd.arg("--no-session").arg("--no-approve");
     }
 
     let mut child = cmd.spawn().map_err(|e| {
@@ -275,6 +273,20 @@ impl PiRpc {
         Ok(state)
     }
 
+    /// Get Pi's current context usage estimate and configured window.
+    pub async fn get_context_usage(&self) -> Result<Option<PiContextUsage>, String> {
+        let stats = self.call("get_session_stats", Value::Null).await?;
+        let Some(context_usage) = stats.get("contextUsage").cloned() else {
+            return Ok(None);
+        };
+        if context_usage.is_null() {
+            return Ok(None);
+        }
+        serde_json::from_value(context_usage)
+            .map(Some)
+            .map_err(|e| format!("failed to parse pi context usage: {e}"))
+    }
+
     /// Set the active model.
     pub async fn set_model(&self, model_id: &str) -> Result<Value, String> {
         let (provider, id) = split_model_id(model_id)
@@ -297,11 +309,6 @@ impl PiRpc {
     /// Abort the current Pi turn.
     pub async fn abort(&self) -> Result<Value, String> {
         self.call("abort", Value::Null).await
-    }
-
-    /// Get the native session ID (for durable resume).
-    pub async fn get_session_id(&self) -> Result<Option<String>, String> {
-        Ok(self.get_state().await?.session_id)
     }
 
     /// Gracefully shut down the Pi child process.
@@ -383,6 +390,14 @@ pub struct PiState {
     #[serde(default)]
     #[allow(dead_code)]
     pub session_name: Option<String>,
+}
+
+/// The live context estimate returned by Pi's `get_session_stats` RPC.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PiContextUsage {
+    pub tokens: Option<u64>,
+    pub context_window: Option<u64>,
 }
 
 #[cfg(test)]

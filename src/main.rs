@@ -20,6 +20,7 @@ mod acp;
 mod discovery;
 mod pi_rpc;
 mod session;
+mod session_task;
 mod translate;
 mod ui_bridge;
 
