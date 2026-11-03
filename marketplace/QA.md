@@ -4,9 +4,35 @@ Provider ID: `pidancr`. Display name: **Pidancr**. Publisher: `edjubert`.
 Minimum app version: `0.16.0`.
 
 The previous author publication and tag were withdrawn before registry acceptance.
-Version `0.2.0` is being qualified again under the `pidancr` identity; no archived
-release is retained. [Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
-is in draft during qualification.
+Version `0.2.0` was republished as
+[Pidancr](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.0)
+on **2026-11-03**; no archived release is retained.
+[Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
+is ready for review and contains only the two `pidancr` contribution files.
+
+## Release qualification
+
+- Qualified source commit: `57612d267c10a2b9c443ed1919118cd1a1a6bc14`.
+- Signed tag `v0.2.0` verified locally and confirmed to resolve to that commit.
+- [Passing CI and final assembly](https://github.com/edjubert/cadencr-plugin-provider-pi/actions/runs/41730300061).
+
+| Native platform | Rust checks | Reproducible packaging | Extracted archive with actual Pi |
+| --- | --- | --- | --- |
+| macOS arm64 | Passed | Passed | Passed |
+| macOS Intel | Passed | Passed | Passed |
+| Linux arm64, Ubuntu 24.04 | Passed | Passed | Passed |
+| Linux x86-64, Ubuntu 24.04 | Passed | Passed | Passed |
+
+All eight public release assets were downloaded without authentication and
+matched the qualified CI bytes and GitHub asset digests. Archive SHA-256 values,
+executable digests and the `pidancr` native evidence matched the package and
+published [SHA256SUMS](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/download/v0.2.0/SHA256SUMS).
+The [native evidence](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/download/v0.2.0/native-qa.json)
+records the checks for each target.
+
+The registry package and submission are byte-for-byte copies of the verified
+public assets. Metadata, submission and complete base/candidate validation
+passed using the pinned registry CLI source below.
 
 ## Tooling and contracts
 
@@ -44,11 +70,11 @@ resume rejection, cancellation, close during a prompt and automatic naming.
 Assembly requires matching provider ID, archive/executable digests and native
 evidence for every declared target.
 
-## Remaining qualification
+## Registry acceptance and limits
 
-Native GitHub jobs must pass for macOS arm64/Intel and Linux arm64/x86-64 before
-author publication and public-download verification. Linux qualification uses
-Ubuntu 24.04/GNU libc; older distributions and Windows are not qualified.
+The [registry workflow](https://github.com/merkr-software/cadencr-registry/actions/runs/41732178470)
+reports `action_required`, pending maintainer intervention. Linux qualification
+uses Ubuntu 24.04/GNU libc; older distributions and Windows are not qualified.
 A signed marketplace installation and packaged-app lifecycle have not been
 exercised. Registry acceptance, mirroring and signed catalog publication remain
 required before marketplace listing.

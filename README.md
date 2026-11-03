@@ -71,8 +71,8 @@ The repository's GitHub Actions workflow produces the reviewable release bundle;
 publishing the author release and accepting the registry contribution are
 separate steps.
 
-Version `0.2.0` is being qualified under the `pidancr` identity for macOS and
-Linux on Intel/x86-64 and arm64.
+The [Pidancr v0.2.0 release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.0)
+is published for macOS and Linux on Intel/x86-64 and arm64.
 [Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
 is awaiting maintainer acceptance before marketplace listing.
 
