@@ -17,6 +17,7 @@ use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex};
 
 use crate::pi_rpc::{spawn, PiRpc, PiState};
+use crate::session_identity;
 use crate::session_task::AutoNameTask;
 use crate::translate::{
     assistant_error_text, assistant_stop_reason, map_stop_reason, translate_event,
@@ -58,14 +59,14 @@ impl PiSession {
         stdout: Arc<Mutex<std::io::Stdout>>,
         pending_permissions: PendingPermissions,
     ) -> Result<Self, String> {
-        let cwd_path = std::path::Path::new(cwd);
+        let cwd_path = session_identity::workspace(cwd)?;
         let auto_name = auto_name_task.is_some();
         let mut pi_args = provider_args.to_vec();
         if let Some(task) = auto_name_task {
             pi_args.extend(task.pi_args());
         }
         // Title generation must not leave a durable Pi session behind.
-        let rpc = spawn(cwd_path, None, auto_name, &pi_args)?;
+        let rpc = spawn(&cwd_path, None, auto_name, &pi_args)?;
 
         let config_options = match crate::discovery::load_config_options(&rpc).await {
             Ok(options) => options,
@@ -82,6 +83,15 @@ impl PiSession {
             }
         };
         let session_id = match state.session_id.clone() {
+            Some(session_id) if !auto_name => {
+                match session_identity::encode(&cwd_path, &session_id) {
+                    Ok(session_id) => session_id,
+                    Err(error) => {
+                        rpc.shutdown().await;
+                        return Err(error);
+                    }
+                }
+            }
             Some(session_id) => session_id,
             None if auto_name => format!(
                 "cadencr-auto-name-{}-{}",
@@ -111,7 +121,7 @@ impl PiSession {
         })
     }
 
-    /// Resume a session: spawn Pi RPC with `--session <id>`.
+    /// Resume the exact native session in the identity's original workspace.
     pub async fn resume(
         cwd: &str,
         session_id: &str,
@@ -119,8 +129,9 @@ impl PiSession {
         stdout: Arc<Mutex<std::io::Stdout>>,
         pending_permissions: PendingPermissions,
     ) -> Result<Self, String> {
-        let cwd_path = std::path::Path::new(cwd);
-        let rpc = spawn(cwd_path, Some(session_id), false, provider_args)?;
+        let cwd_path = session_identity::workspace(cwd)?;
+        let native_id = session_identity::decode(session_id, &cwd_path)?;
+        let rpc = spawn(&cwd_path, Some(&native_id), false, provider_args)?;
 
         let state = match rpc.get_state().await {
             Ok(state) => state,
@@ -129,12 +140,23 @@ impl PiSession {
                 return Err(error);
             }
         };
-        if state.session_id.as_deref() != Some(session_id) {
+        if state.session_id.as_deref() != Some(native_id.as_str()) {
             rpc.shutdown().await;
             return Err(format!(
                 "pi session mismatch: expected `{session_id}`, got `{}`",
                 state.session_id.unwrap_or_default()
             ));
+        }
+        // Pi creates a new empty session for a missing --session-id. Never
+        // present that replacement as restored context. The host's prompt-free
+        // conformance probe recognizes this explicit absence as unprobed.
+        if !state
+            .session_file
+            .as_ref()
+            .is_some_and(|path| path.is_file())
+        {
+            rpc.shutdown().await;
+            return Err(format!("Session \"{session_id}\" not found"));
         }
         let config_options = match crate::discovery::load_config_options(&rpc).await {
             Ok(options) => options,
@@ -357,6 +379,9 @@ impl PiSession {
 
     /// Gracefully shut down the Pi child process.
     pub async fn shutdown(&mut self) {
+        if let Some(sender) = self.turn_end_tx.lock().await.take() {
+            let _ = sender.send("cancelled".into());
+        }
         if let Some(task) = self.event_task.take() {
             task.abort();
         }

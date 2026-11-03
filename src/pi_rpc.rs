@@ -41,7 +41,7 @@ pub struct PiRpc {
 /// Spawn a Pi RPC child process.
 ///
 /// - `cwd`: working directory for the Pi process.
-/// - `session_id`: optional native session ID to resume (`--session <id>`).
+/// - `session_id`: optional exact, workspace-local ID (`--session-id <id>`).
 /// - `ephemeral`: when true, adds `--no-session --no-approve` after the other
 ///   arguments so Pi cannot persist or trust project-local resources.
 /// - `extra_args`: additional arguments passed to pi.
@@ -61,7 +61,7 @@ pub fn spawn(
         .stderr(Stdio::inherit());
 
     if let Some(sid) = session_id {
-        cmd.arg("--session").arg(sid);
+        cmd.arg("--session-id").arg(sid);
     }
 
     for arg in extra_args {
@@ -104,6 +104,39 @@ pub fn spawn(
         events: Arc::new(Mutex::new(Some(event_rx))),
         shutdown: Arc::new(Mutex::new(Some(shutdown_tx))),
     })
+}
+
+/// Prevent forwarded Pi arguments from replacing the connector's transport,
+/// session identity or ephemeral-session policy.
+pub fn validate_args(args: &[std::ffi::OsString]) -> Result<Vec<String>, String> {
+    const OWNED_FLAGS: &[&str] = &[
+        "--mode",
+        "--print",
+        "-p",
+        "--continue",
+        "-c",
+        "--resume",
+        "-r",
+        "--session",
+        "--session-id",
+        "--fork",
+        "--no-session",
+        "--approve",
+        "-a",
+        "--no-approve",
+        "-na",
+        "--",
+    ];
+    args.iter()
+        .map(|arg| {
+            let arg = arg.to_str().ok_or("Pi arguments must be UTF-8")?;
+            let flag = arg.split('=').next().unwrap_or(arg);
+            if OWNED_FLAGS.contains(&flag) {
+                return Err(format!("Pi argument `{arg}` conflicts with the connector"));
+            }
+            Ok(arg.to_string())
+        })
+        .collect()
 }
 
 fn read_loop<R: Read>(
@@ -388,6 +421,8 @@ pub struct PiState {
     #[serde(default)]
     pub session_id: Option<String>,
     #[serde(default)]
+    pub session_file: Option<std::path::PathBuf>,
+    #[serde(default)]
     #[allow(dead_code)]
     pub session_name: Option<String>,
 }
@@ -403,6 +438,24 @@ pub struct PiContextUsage {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn forwarded_arguments_cannot_override_connector_flags() {
+        for arg in [
+            "--mode=json",
+            "--session",
+            "--session-id=x",
+            "--no-session",
+            "-p",
+            "--",
+        ] {
+            assert!(validate_args(&[arg.into()]).is_err(), "{arg}");
+        }
+        assert_eq!(
+            validate_args(&["--provider".into(), "local".into()]).unwrap(),
+            ["--provider", "local"]
+        );
+    }
 
     #[test]
     fn acp_model_id_with_provider() {

@@ -14,7 +14,7 @@ The connector implements the Cadencr provider executable contract:
 | Command | Behavior |
 | --- | --- |
 | `version` | Prints the connector version. |
-| `models --format acp-config-options-v1 --cwd <abs>` | Launches `pi --mode rpc --no-session --no-approve` in the workspace, calls `get_available_models` and `get_state`, and prints the ACP v1 `SessionConfigOption` array. |
+| `models --format acp-config-options-v1 --cwd <abs> [Pi args]` | Launches `pi --mode rpc --no-session --no-approve` in the workspace, calls `get_available_models` and `get_state`, and prints the ACP v1 `SessionConfigOption` array. |
 | `run --protocol acp-v1` | Starts an ACP v1 JSON-RPC server over stdio. Each ACP session owns a persistent `pi --mode rpc` child process; Pi events are translated to ACP session updates. |
 
 ## Prerequisites
@@ -23,19 +23,18 @@ Authentication is handled entirely by the native Pi CLI, per the Cadencr
 connector contract. Before installing or running the connector:
 
 ```bash
-# Configure Pi providers and API keys
-pi config
-
-# Or edit ~/.pi/agent/settings.json directly
+# Start Pi and use /login to authenticate, then /model to select a model
+pi
 ```
 
 The connector and Cadencr never collect, store, or broker Pi credentials.
+Pi `0.85.1` is the version audited by the release's native protocol QA.
 
 ## Install the Pi CLI
 
 ```bash
 # Via npm
-npm install -g @earendil-works/pi-coding-agent
+npm install -g @earendil-works/pi-coding-agent@0.85.1
 
 # Or see https://github.com/earendil-works/pi for other install methods
 ```
@@ -52,12 +51,29 @@ cargo build --release
 
 `pi` is resolved in this order:
 
-1. `CADENCR_PI_COMMAND` environment variable (absolute path recommended);
-2. `pi` on `PATH`.
+1. `PI_COMMAND` environment variable (absolute path recommended);
+2. `CADENCR_PI_COMMAND` (legacy local installations only);
+3. `pi` on `PATH`.
+
+Managed marketplace processes remove inherited `CADENCR_*` variables. Use
+`PI_COMMAND` for that installation mode. The connector is a native Rust binary;
+Node is needed by Pi only.
+
+## CadencR 0.16.0 marketplace
+
+The independent provider is named **Pi (Rust connector)** with ID `pi-rust`,
+publisher `edjubert`, and minimum app version `0.16.0`. The marketplace's
+official `pi` connector is a separate implementation.
+
+See [marketplace release instructions](https://github.com/edjubert/cadencr-plugin-provider-pi/blob/main/marketplace/README.md) for canonical
+packaging, native platform qualification, author release and registry submission.
+The repository's GitHub Actions workflow produces the reviewable release bundle;
+publishing the author release and accepting the registry contribution are
+separate steps.
 
 ## Local Cadencr install
 
-1. Copy `descriptor/pi.json` to `~/.cadencr/settings/providers/pi.json`.
+1. Copy `descriptor/pi-rust.json` to `~/.cadencr/settings/providers/pi-rust.json`.
 2. Replace both `/ABSOLUTE/PATH/TO/...` placeholders with this repository's absolute path.
 3. Restart Cadencr. Provider registration is read once at startup; hot reload is not supported.
 
@@ -68,7 +84,7 @@ Add an `env` block to the descriptor's `installation.executable`:
 ```json
 "env": {
   "PATH": "/ABSOLUTE/PATH/TO/node/bin:/opt/homebrew/bin:/usr/bin:/bin",
-  "CADENCR_PI_COMMAND": "/ABSOLUTE/PATH/TO/node/bin/pi"
+  "PI_COMMAND": "/ABSOLUTE/PATH/TO/node/bin/pi"
 }
 ```
 
@@ -84,7 +100,7 @@ README.
 Settings default to a `cadencr-settings` directory beside the database file.
 With the standard `pnpm dev` configuration (`CADENCR_DB_PATH=./cadencr.local.db`),
 the service runs from `packages/service`, so install the descriptor at
-`packages/service/cadencr-settings/providers/pi.json`.
+`packages/service/cadencr-settings/providers/pi-rust.json`.
 The repository-root `cadencr-settings` directory is not read in this setup.
 An explicit `CADENCR_SETTINGS_DIR` overrides this location.
 
@@ -129,8 +145,9 @@ pi --mode rpc  (native Pi RPC child)
 - `agent_settled` ends `session/prompt`. Its ACP `stopReason` comes from the
   last assistant `message_end`: `stop`, `toolUse`, and `error` map to
   `end_turn`; `length` maps to `max_tokens`; `aborted` maps to `cancelled`.
-- Durable resume: `session/resume` spawns `pi --mode rpc --session <id>`
-  to restore the native Pi session context.
+- Durable resume: workspace-bound ACP identities restore the exact native Pi
+  UUID through `pi --mode rpc --session-id <id>`. An unpersisted or missing
+  session returns ACP's explicit session-not-found error.
 - `session/close` terminates the Pi child process cleanly.
 
 ## Permissions
@@ -142,23 +159,25 @@ cancelled; notifications and status updates are ignored.
 
 ## Known limitations
 
-- Context usage is not reported to ACP.
 - Compaction, fork, clone, steer, and follow-up operations are not supported.
 - The connector has no separate direct bash operation and does not support
   image input in prompts.
 - `--no-approve` is used for model discovery only. Sessions use Pi's default
   project-trust behavior.
+- Version `0.2.0` replaces raw native session IDs with workspace-bound ACP IDs.
+  Start a new CadencR conversation when upgrading from `0.1.0`; existing native
+  sessions remain available through Pi itself.
 
 ## Notes
 
 - Model discovery stays under Cadencr's 10-second host timeout with an
   internal 8-second budget.
 - The connector relies on Pi's RPC mode (`pi --mode rpc`), not `pi-acp`.
-- Pi's native session ID is used as the ACP session ID for durable resume.
+- ACP session IDs bind Pi's native UUID to the canonical workspace.
 - Thinking levels are exposed as a generic ACP select option when Pi
   models advertise multiple levels.
-- Publication to the Cadencr registry (signed package via `pack-provider`)
-  is a later step; the registry contribution gate is not open yet.
+- Supported release targets must pass native QA on their own runners before
+  appearing in marketplace metadata.
 
 ## License
 

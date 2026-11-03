@@ -31,6 +31,7 @@ Pi names and logos remain subject to their respective trademark rights.
 This connector depends on the following open-source crates:
 
 - `agent-client-protocol` — Apache-2.0 / MIT
+- `base64` — Apache-2.0 / MIT
 - `serde` — Apache-2.0 / MIT
 - `serde_json` — Apache-2.0 / MIT
 - `tokio` — MIT

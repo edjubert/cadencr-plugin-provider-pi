@@ -20,6 +20,7 @@ mod acp;
 mod discovery;
 mod pi_rpc;
 mod session;
+mod session_identity;
 mod session_task;
 mod translate;
 mod ui_bridge;
@@ -28,7 +29,8 @@ const MODEL_DISCOVERY_FORMAT: &str = "acp-config-options-v1";
 const ACP_V1_PROTOCOL: &str = "acp-v1";
 
 /// Environment variable to override the native Pi executable path.
-pub const PI_COMMAND_ENV: &str = "CADENCR_PI_COMMAND";
+pub const PI_COMMAND_ENV: &str = "PI_COMMAND";
+const LEGACY_PI_COMMAND_ENV: &str = "CADENCR_PI_COMMAND";
 const DEFAULT_PI_COMMAND: &str = "pi";
 
 fn main() -> ExitCode {
@@ -71,7 +73,8 @@ fn execute_models(args: &[OsString]) -> Result<ExitCode, String> {
     if !cwd.is_absolute() {
         return Err("models `--cwd` must be absolute".to_string());
     }
-    let options = discovery::discover_model_options(&cwd)?;
+    let provider_args = pi_rpc::validate_args(&args[4..])?;
+    let options = discovery::discover_model_options(&cwd, &provider_args)?;
     serde_json::to_writer(std::io::stdout().lock(), &options).map_err(|e| e.to_string())?;
     println!();
     Ok(ExitCode::SUCCESS)
@@ -82,6 +85,7 @@ fn execute_run(args: &[OsString]) -> Result<ExitCode, String> {
         return Err(format!("run requires `--protocol {ACP_V1_PROTOCOL}`"));
     }
     let provider_args: Vec<OsString> = args[2..].to_vec();
+    pi_rpc::validate_args(&provider_args)?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -91,7 +95,9 @@ fn execute_run(args: &[OsString]) -> Result<ExitCode, String> {
 
 /// Resolve the native Pi executable path.
 pub fn pi_command() -> String {
-    std::env::var(PI_COMMAND_ENV).unwrap_or_else(|_| DEFAULT_PI_COMMAND.to_string())
+    std::env::var(PI_COMMAND_ENV)
+        .or_else(|_| std::env::var(LEGACY_PI_COMMAND_ENV))
+        .unwrap_or_else(|_| DEFAULT_PI_COMMAND.to_string())
 }
 
 #[cfg(test)]

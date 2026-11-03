@@ -1,0 +1,172 @@
+name: Validate and prepare marketplace release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the verified release (dispatch from its existing vVERSION tag)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  # Exact source revision of the published CadencR v0.16.0.
+  CADENCR_COMMIT: 7affa5ec15088db7c6dfe4f743f08fe981ac2b7d
+
+jobs:
+  qualify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            rust_target: aarch64-apple-darwin
+            target: darwin-aarch64
+          - runner: macos-15-intel
+            rust_target: x86_64-apple-darwin
+            target: darwin-x86_64
+          - runner: ubuntu-24.04
+            rust_target: x86_64-unknown-linux-gnu
+            target: linux-x86_64
+          - runner: ubuntu-24.04-arm
+            rust_target: aarch64-unknown-linux-gnu
+            target: linux-aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: ${{ matrix.rust_target }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check Rust
+        run: |
+          cargo fmt --check
+          cargo test --locked
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo build --locked --release --target "${{ matrix.rust_target }}"
+      - uses: actions/checkout@v4
+        with:
+          repository: merkr-software/CadencR
+          ref: ${{ env.CADENCR_COMMIT }}
+          path: dist/cadencr
+          persist-credentials: false
+      - name: Build the pinned canonical packer
+        working-directory: dist/cadencr
+        run: node scripts/cargo-env.mjs cargo build --locked -p cadencr-cli
+      - name: Install the audited native Pi runtime
+        run: npm install --prefix dist/pi --no-audit --no-fund @earendil-works/pi-coding-agent@0.85.1
+      - name: Prepare and validate a reproducible archive
+        run: |
+          python scripts/package-release.py package \
+            --target "${{ matrix.target }}" \
+            --binary "target/${{ matrix.rust_target }}/release/cadencr-plugin-provider-pi" \
+            --cli dist/cadencr/target/debug/cadencr \
+            --output "dist/${{ matrix.target }}"
+      - name: Qualify the extracted archive with actual Pi
+        run: |
+          node scripts/native-qa.mjs \
+            --provider "$PWD/dist/${{ matrix.target }}/extracted/bin/provider" \
+            --pi "$PWD/dist/pi/node_modules/.bin/pi" \
+            --output "$PWD/dist/${{ matrix.target }}/native-qa.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          if-no-files-found: error
+          path: |
+            dist/${{ matrix.target }}/provider-*.tar.gz
+            dist/${{ matrix.target }}/package.json
+            dist/${{ matrix.target }}/native-qa.json
+
+  assemble:
+    needs: qualify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/checkout@v4
+        with:
+          repository: merkr-software/CadencR
+          ref: ${{ env.CADENCR_COMMIT }}
+          path: dist/cadencr
+          persist-credentials: false
+      - name: Build the pinned registry validator
+        working-directory: dist/cadencr
+        run: node scripts/cargo-env.mjs cargo build --locked -p cadencr-cli
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/artifacts
+      - name: Assemble source-pinned metadata and submission
+        run: |
+          python scripts/package-release.py assemble \
+            --artifacts dist/artifacts \
+            --targets darwin-aarch64 darwin-x86_64 linux-aarch64 linux-x86_64 \
+            --source-commit "$GITHUB_SHA" \
+            --changelog marketplace/RELEASE_NOTES.md \
+            --cli dist/cadencr/target/debug/cadencr \
+            --output dist/release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: marketplace-release
+          if-no-files-found: error
+          path: dist/release/
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    needs: assemble
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: marketplace-release
+          path: dist/release
+      - name: Verify the selected release tag
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          submission = json.loads(Path("dist/release/submission.json").read_text())
+          assert os.environ["REF_TYPE"] == "tag", "Publication requires an existing release tag"
+          assert os.environ["REF_NAME"] == submission["source"]["tag"], "Tag/version mismatch"
+          assert os.environ["GITHUB_SHA"] == submission["source"]["commit"], "Source commit mismatch"
+          PY
+      - name: Publish new immutable author assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" --verify-tag --title "Pi Rust connector $RELEASE_TAG" \
+            --notes-file dist/release/RELEASE_NOTES.md \
+            dist/release/provider-*.tar.gz dist/release/package.json \
+            dist/release/submission.json dist/release/SHA256SUMS dist/release/native-qa.json

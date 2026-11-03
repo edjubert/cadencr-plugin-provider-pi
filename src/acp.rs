@@ -148,6 +148,13 @@ type AcpResult = Result<Value, (i64, String)>;
 fn jsonrpc_response(id: &Value, response: AcpResult) -> Value {
     match response {
         Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
+        Err((-32602, message)) => json!({
+            "jsonrpc": "2.0", "id": id,
+            "error": {
+                "code": -32602, "message": "Invalid params",
+                "data": { "message": message },
+            },
+        }),
         Err((code, message)) => json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -207,11 +214,17 @@ fn handle_initialize(params: &Value) -> AcpResult {
         .and_then(Value::as_u64)
         .unwrap_or(1);
 
-    Ok(json!({
-        "protocolVersion": protocol_version,
-        "agentCapabilities": {
+    let capabilities = if protocol_version == 1 {
+        json!({
             "loadSession": true,
-        },
+            "sessionCapabilities": { "resume": {}, "close": {} },
+        })
+    } else {
+        json!({})
+    };
+    Ok(json!({
+        "protocolVersion": 1,
+        "agentCapabilities": capabilities,
         "agentInfo": {
             "name": "cadencr-plugin-provider-pi",
             "title": "Cadencr Pi connector",
@@ -384,6 +397,12 @@ async fn handle_session_resume(
         .pointer("/cwd")
         .and_then(Value::as_str)
         .ok_or((-32602, "session/resume requires `cwd`".to_string()))?;
+    if sessions.lock().await.contains_key(session_id) {
+        return Err((
+            -32602,
+            format!("Pi session `{session_id}` is already active"),
+        ));
+    }
 
     let session = PiSession::resume(
         cwd,
@@ -393,7 +412,14 @@ async fn handle_session_resume(
         pending_permissions.clone(),
     )
     .await
-    .map_err(|e| (-32000, e))?;
+    .map_err(|e| {
+        let code = if e == format!("Session \"{session_id}\" not found") {
+            -32602
+        } else {
+            -32000
+        };
+        (code, e)
+    })?;
 
     let config_options = session.config_options();
 
@@ -427,6 +453,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn negotiates_only_v1_and_advertises_implemented_lifecycle() {
+        let response = handle_initialize(&json!({ "protocolVersion": 1 })).unwrap();
+        assert_eq!(response["protocolVersion"], 1);
+        assert_eq!(response["agentCapabilities"]["loadSession"], true);
+        assert_eq!(
+            response["agentCapabilities"]["sessionCapabilities"]["resume"],
+            json!({})
+        );
+        assert_eq!(
+            response["agentCapabilities"]["sessionCapabilities"]["close"],
+            json!({})
+        );
+        let unsupported = handle_initialize(&json!({ "protocolVersion": 2 })).unwrap();
+        assert_eq!(unsupported["protocolVersion"], 1);
+        assert_eq!(unsupported["agentCapabilities"], json!({}));
+    }
+
+    #[test]
     fn jsonrpc_response_shapes() {
         let ok = jsonrpc_response(&json!(3), Ok(json!({ "stopReason": "end_turn" })));
         assert_eq!(ok["result"]["stopReason"], "end_turn");
@@ -435,5 +479,13 @@ mod tests {
         assert_eq!(err["error"]["code"], -32000);
         assert_eq!(err["error"]["message"], "boom");
         assert!(err.get("result").is_none());
+        let missing = jsonrpc_response(
+            &json!(4),
+            Err((-32602, "Session \"probe\" not found".into())),
+        );
+        assert_eq!(
+            missing["error"]["data"]["message"],
+            "Session \"probe\" not found"
+        );
     }
 }

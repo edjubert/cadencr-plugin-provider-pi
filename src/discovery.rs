@@ -20,21 +20,27 @@ use crate::pi_rpc::{spawn, PiModel, PiRpc, PiState};
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(8);
 
 /// Discover model options for the workspace at `cwd`.
-pub fn discover_model_options(cwd: &Path) -> Result<Vec<SessionConfigOption>, String> {
+pub fn discover_model_options(
+    cwd: &Path,
+    provider_args: &[String],
+) -> Result<Vec<SessionConfigOption>, String> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| format!("failed to create runtime: {e}"))?;
 
     runtime.block_on(async {
-        tokio::time::timeout(DISCOVERY_TIMEOUT, discover_inner(cwd))
+        tokio::time::timeout(DISCOVERY_TIMEOUT, discover_inner(cwd, provider_args))
             .await
             .map_err(|_| "pi model discovery timed out after 8 seconds".to_string())?
     })
 }
 
-async fn discover_inner(cwd: &Path) -> Result<Vec<SessionConfigOption>, String> {
-    let rpc = spawn(cwd, None, true, &[])?;
+async fn discover_inner(
+    cwd: &Path,
+    provider_args: &[String],
+) -> Result<Vec<SessionConfigOption>, String> {
+    let rpc = spawn(cwd, None, true, provider_args)?;
     let options = load_config_options(&rpc).await;
     rpc.shutdown().await;
     options
@@ -271,6 +277,7 @@ mod tests {
             model: Some(models[0].clone()),
             thinking_level: Some("low".to_string()),
             session_id: None,
+            session_file: None,
             session_name: None,
         };
         let option = build_thinking_option(&models, Some(&state)).expect("thinking option");
@@ -310,6 +317,7 @@ mod tests {
             model: Some(models[1].clone()),
             thinking_level: None,
             session_id: None,
+            session_file: None,
             session_name: None,
         };
         apply_thinking_levels(&mut models, &state, vec!["off".into(), "high".into()]);
