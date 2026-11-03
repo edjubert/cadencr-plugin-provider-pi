@@ -5,6 +5,11 @@ This repository's first marketplace version is **0.2.0**, compatible with
 The official registry already owns `pi` under publisher `cadencr`; that identity
 cannot be transferred through a normal version submission.
 
+The [author release v0.2.0](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.0)
+is published, and [registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
+is submitted. Marketplace availability requires maintainer acceptance and signed
+catalog publication. See [qualification results](QA.md).
+
 The package template is an authoring input. Its empty platform map is filled
 only by the packaging script; it is not installable metadata.
 
@@ -46,12 +51,16 @@ under the system temporary directory.
 
 ## Publish and submit
 
-1. Review and commit the source, then push it and the matching `v0.2.0` tag.
-2. Run **Validate and prepare marketplace release** from that tag with `publish`
-   unchecked. Review the `marketplace-release` artifact: all archives,
+1. Review and commit the source, then push it to `main` to run
+   **Validate and prepare marketplace release**.
+2. Review the successful run's `marketplace-release` artifact: all archives,
    `package.json`, `submission.json`, `SHA256SUMS`, native QA evidence and notes.
-3. Explicitly dispatch the same tag with `publish` checked to create the author
-   GitHub release. An existing release is refused; assets are not overwritten.
+   Confirm that the submission pins the exact tested source commit.
+3. Tag that commit as `v0.2.0` and push the tag. After publication authorization,
+   either publish the reviewed bundle with `gh release create --verify-tag`,
+   or dispatch the same tag with `publish` checked to qualify and publish a new
+   bundle through the workflow. An existing release is refused; assets are not
+   overwritten.
 4. Verify the downloaded public archive hashes against `SHA256SUMS`.
 5. In a personal fork of `merkr-software/cadencr-registry`, add:
 
@@ -67,6 +76,7 @@ Registry CI, publisher continuity, source ownership and maintainer acceptance
 remain required. The registry signs and mirrors accepted packages. An author
 release alone does not make the plugin appear in the marketplace.
 
-The workflow prepares artifacts on pushes/PRs; publication requires the explicit
-dispatch input. It never opens a registry PR, replies to reviews, merges, or signs
-the registry catalog.
+The workflow prepares artifacts on pushes/PRs; its publication job requires the
+explicit dispatch input. A manually published bundle must be the exact reviewed
+CI bytes for the matching source tag. The workflow never opens a registry PR,
+replies to reviews, merges, or signs the registry catalog.
