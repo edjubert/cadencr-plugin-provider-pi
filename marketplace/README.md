@@ -1,14 +1,15 @@
 # Marketplace release
 
 This repository's first marketplace version is **0.2.0**, compatible with
-**CadencR >=0.16.0**. Its provider ID is `pi-rust` and publisher is `edjubert`.
+**CadencR >=0.16.0**. Its provider ID is `pidancr`, display name is **Pidancr**
+and publisher is `edjubert`.
 The official registry already owns `pi` under publisher `cadencr`; that identity
 cannot be transferred through a normal version submission.
 
-The [author release v0.2.0](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.0)
-is published, and [registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
-is submitted. Marketplace availability requires maintainer acceptance and signed
-catalog publication. See [qualification results](QA.md).
+Version `0.2.0` is being qualified under the `pidancr` identity.
+[Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
+is in draft during qualification. Marketplace availability requires maintainer
+acceptance and signed catalog publication. See [qualification results](QA.md).
 
 The package template is an authoring input. Its empty platform map is filled
 only by the packaging script; it is not installable metadata.
@@ -65,8 +66,8 @@ under the system temporary directory.
 5. In a personal fork of `merkr-software/cadencr-registry`, add:
 
    ```text
-   packages/pi-rust-0.2.0.json      ← package.json
-   submissions/pi-rust-0.2.0.json   ← submission.json
+   packages/pidancr-0.2.0.json      ← package.json
+   submissions/pidancr-0.2.0.json   ← submission.json
    ```
 
 6. Run `cadencr registry validate --base <accepted-registry> --candidate <fork>`,

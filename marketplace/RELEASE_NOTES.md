@@ -1,7 +1,8 @@
-## Pi Rust connector 0.2.0
+## Pidancr 0.2.0
 
 - Prepare native, reproducible provider archives for the CadencR 0.16.0 marketplace.
-- Register the independent connector as `pi-rust`, published by `edjubert`.
+- Register the independent connector as `pidancr`, displayed as **Pidancr** and
+  published by `edjubert`.
   The official marketplace's `pi` connector is a separate implementation.
 - Negotiate ACP v1 and advertise durable resume and close.
 - Bind session identities to their workspace and restore only persisted native

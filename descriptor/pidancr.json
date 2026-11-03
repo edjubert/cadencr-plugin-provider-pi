@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "agent": {
-    "id": "pi-rust",
-    "name": "Pi (Rust connector)",
+    "id": "pidancr",
+    "name": "Pidancr",
     "version": "0.2.0",
     "description": "Pi coding agent, bridged to Cadencr through its native RPC mode (pi --mode rpc).",
     "repository": "https://github.com/edjubert/cadencr-plugin-provider-pi",

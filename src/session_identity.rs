@@ -3,7 +3,7 @@
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use std::path::{Path, PathBuf};
 
-const PREFIX: &str = "pi-rust-v1.";
+const PREFIX: &str = "pidancr-v1.";
 
 pub fn workspace(cwd: &str) -> Result<PathBuf, String> {
     let path = Path::new(cwd);
@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn refuses_legacy_paths_partial_ids_and_malformed_payloads() {
-        for id in [UUID, "/tmp/session.jsonl", "pi-rust-v1.invalid"] {
+        for id in [UUID, "/tmp/session.jsonl", "pidancr-v1.invalid"] {
             assert!(decode(id, Path::new("/workspace")).is_err());
         }
         for native_id in ["", "12345678", "/tmp/session.jsonl"] {

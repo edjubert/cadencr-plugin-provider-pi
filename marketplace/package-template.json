@@ -1,9 +1,9 @@
 {
   "agent": {
-    "id": "pi-rust",
-    "name": "Pi (Rust connector)",
+    "id": "pidancr",
+    "name": "Pidancr",
     "version": "0.2.0",
-    "description": "Independent Rust connector for Pi's native RPC mode.",
+    "description": "Independent ACP connector for Pi's native RPC mode.",
     "repository": "https://github.com/edjubert/cadencr-plugin-provider-pi",
     "website": "https://github.com/earendil-works/pi",
     "authors": ["edjubert"],

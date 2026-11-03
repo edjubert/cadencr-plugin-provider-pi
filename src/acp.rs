@@ -226,8 +226,8 @@ fn handle_initialize(params: &Value) -> AcpResult {
         "protocolVersion": 1,
         "agentCapabilities": capabilities,
         "agentInfo": {
-            "name": "cadencr-plugin-provider-pi",
-            "title": "Cadencr Pi connector",
+            "name": "pidancr",
+            "title": "Pidancr",
             "version": env!("CARGO_PKG_VERSION"),
         },
     }))

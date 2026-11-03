@@ -1,4 +1,4 @@
-# cadencr-plugin-provider-pi
+# Pidancr
 
 <p align="center">
   <img src="icon.svg" alt="Cadencr + Pi" width="256" height="256">
@@ -61,7 +61,7 @@ Node is needed by Pi only.
 
 ## CadencR 0.16.0 marketplace
 
-The independent provider is named **Pi (Rust connector)** with ID `pi-rust`,
+The independent provider is named **Pidancr** with ID `pidancr`,
 publisher `edjubert`, and minimum app version `0.16.0`. The marketplace's
 official `pi` connector is a separate implementation.
 
@@ -71,14 +71,14 @@ The repository's GitHub Actions workflow produces the reviewable release bundle;
 publishing the author release and accepting the registry contribution are
 separate steps.
 
-The [v0.2.0 author release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.0)
-is available for macOS and Linux on Intel/x86-64 and arm64.
+Version `0.2.0` is being qualified under the `pidancr` identity for macOS and
+Linux on Intel/x86-64 and arm64.
 [Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
 is awaiting maintainer acceptance before marketplace listing.
 
 ## Local Cadencr install
 
-1. Copy `descriptor/pi-rust.json` to `~/.cadencr/settings/providers/pi-rust.json`.
+1. Copy `descriptor/pidancr.json` to `~/.cadencr/settings/providers/pidancr.json`.
 2. Replace both `/ABSOLUTE/PATH/TO/...` placeholders with this repository's absolute path.
 3. Restart Cadencr. Provider registration is read once at startup; hot reload is not supported.
 
@@ -105,7 +105,7 @@ README.
 Settings default to a `cadencr-settings` directory beside the database file.
 With the standard `pnpm dev` configuration (`CADENCR_DB_PATH=./cadencr.local.db`),
 the service runs from `packages/service`, so install the descriptor at
-`packages/service/cadencr-settings/providers/pi-rust.json`.
+`packages/service/cadencr-settings/providers/pidancr.json`.
 The repository-root `cadencr-settings` directory is not read in this setup.
 An explicit `CADENCR_SETTINGS_DIR` overrides this location.
 

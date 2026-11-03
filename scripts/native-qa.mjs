@@ -23,7 +23,7 @@ const target = `${{ darwin: "darwin", linux: "linux" }[process.platform]}-${{
   arm64: "aarch64", x64: "x86_64",
 }[process.arch]}`;
 assert.ok(["darwin-aarch64", "darwin-x86_64", "linux-aarch64", "linux-x86_64"].includes(target));
-const scratch = await mkdtemp(join(tmpdir(), "pi-rust-native-"));
+const scratch = await mkdtemp(join(tmpdir(), "pidancr-native-"));
 const home = join(scratch, "home");
 const agent = join(scratch, "agent");
 const cwd = join(scratch, "workspace");
@@ -174,9 +174,12 @@ try {
   assert.equal(incompatible.protocolVersion, 1);
   assert.deepEqual(incompatible.agentCapabilities, {});
   const initialized = await active.request("initialize", initialize);
+  assert.equal(initialized.agentInfo.name, "pidancr");
+  assert.equal(initialized.agentInfo.title, "Pidancr");
   assert.equal(initialized.agentInfo.version, version);
   assert.deepEqual(initialized.agentCapabilities.sessionCapabilities, { resume: {}, close: {} });
   const empty = await active.request("session/new", { cwd, mcpServers: [] });
+  assert.ok(empty.sessionId.startsWith("pidancr-v1."));
   assert.deepEqual(empty.configOptions, catalog);
   await active.request("session/set_config_option", { sessionId: empty.sessionId, configId: "model", value: model });
   await active.request("session/close", { sessionId: empty.sessionId });
@@ -220,8 +223,9 @@ try {
   await active.request("session/close", { sessionId: naming.sessionId });
   const providerSha256 = createHash("sha256").update(await readFile(options["--provider"])).digest("hex");
   await writeFile(options["--output"], JSON.stringify({
-    passed: true, target, version, pi_version: piVersion, provider_sha256: providerSha256,
-    checks: ["discovery", "ACP v1", "model selection", "empty-session absence", "streaming", "usage",
+    passed: true, target, version, provider_id: initialized.agentInfo.name,
+    pi_version: piVersion, provider_sha256: providerSha256,
+    checks: ["identity", "discovery", "ACP v1", "model selection", "empty-session absence", "streaming", "usage",
       "durable resume", "workspace isolation", "duplicate resume rejection", "cancellation",
       "close while prompting", "auto naming"],
   }, null, 2) + "\n", { flag: "wx" });
