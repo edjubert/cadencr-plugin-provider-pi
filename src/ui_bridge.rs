@@ -9,6 +9,9 @@ use tokio::sync::{oneshot, Mutex};
 use crate::pi_rpc::PiRpc;
 use crate::session::PendingPermissions;
 
+// Pending permission responses are shared by every session in this process.
+static NEXT_PERMISSION_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
+
 /// What the user is asked, derived from a Pi dialog request.
 #[derive(Debug, PartialEq)]
 pub enum Dialog {
@@ -112,7 +115,6 @@ pub async fn handle_ui_request(
     session_id: String,
     event: Value,
     pending: PendingPermissions,
-    counter: Arc<AtomicU64>,
 ) {
     let request_id = event
         .get("id")
@@ -128,7 +130,7 @@ pub async fn handle_ui_request(
         UiRequest::Ask(dialog) => dialog,
     };
 
-    let req_id = counter.fetch_add(1, Ordering::SeqCst);
+    let req_id = NEXT_PERMISSION_REQUEST_ID.fetch_add(1, Ordering::SeqCst);
     let (tx, rx) = oneshot::channel::<Value>();
     pending.lock().await.insert(req_id, tx);
 

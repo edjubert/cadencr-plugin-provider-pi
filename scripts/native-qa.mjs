@@ -45,7 +45,7 @@ const server = createServer(async (request, response) => {
     assert.equal(parsed.stream, true);
     requests.push(parsed);
     response.writeHead(200, { "Content-Type": "text/event-stream" });
-    const text = ["FIRST", "RESUMED", "HELD", "HELD", "TITLE"][requests.length - 1];
+    const text = ["FIRST", "RESUMED", "HELD", "HELD", "TITLE", "PERMISSION", "PERMISSION"][requests.length - 1];
     assert.ok(text, "unexpected model request");
     const chunk = (delta, finish_reason = null, usage) => response.write(
       `data: ${JSON.stringify({
@@ -92,11 +92,15 @@ await writeFile(join(agent, "models.json"), JSON.stringify({
   },
 }));
 
-function start() {
-  const child = spawn(options["--provider"], ["run", "--protocol", "acp-v1", ...args], {
+function start(extension) {
+  const piArgs = extension
+    ? [...args.filter((arg) => arg !== "--no-extensions"), "--extension", extension]
+    : args;
+  const child = spawn(options["--provider"], ["run", "--protocol", "acp-v1", ...piArgs], {
     cwd, env, stdio: ["pipe", "pipe", "pipe"],
   });
   const updates = [];
+  const permissions = [];
   const pending = new Map();
   let nextId = 0;
   const lines = createInterface({ input: child.stdout });
@@ -111,6 +115,7 @@ function start() {
     try {
       const message = JSON.parse(line);
       if (message.method === "session/update") updates.push(message.params.update);
+      else if (message.method === "session/request_permission") permissions.push(message);
       else if (message.method) throw new Error(`unexpected server request: ${message.method}`);
       else {
         const request = pending.get(message.id);
@@ -122,7 +127,7 @@ function start() {
     } catch (error) { fail(error); }
   });
   return {
-    updates,
+    updates, permissions,
     request(method, params) {
       return new Promise((resolve, reject) => {
         const id = ++nextId;
@@ -136,6 +141,11 @@ function start() {
     },
     notify(method, params) {
       child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`);
+    },
+    respondPermission(id, optionId) {
+      child.stdin.write(`${JSON.stringify({
+        jsonrpc: "2.0", id, result: { outcome: { outcome: "selected", optionId } },
+      })}\n`);
     },
     async stop() {
       if (child.exitCode !== null) return;
@@ -162,7 +172,7 @@ async function turn(client, sessionId, text, expected) {
 let active;
 try {
   const piVersion = execFileSync(options["--pi"], ["--version"], { cwd, env, encoding: "utf8", timeout: 15_000 }).trim();
-  assert.equal(piVersion, "0.85.1");
+  assert.equal(piVersion, options["--pi-version"] ?? "1.5.0");
   const version = execFileSync(options["--provider"], ["version"], { encoding: "utf8" }).trim();
   const catalog = JSON.parse(execFileSync(options["--provider"],
     ["models", "--format", "acp-config-options-v1", "--cwd", cwd, ...args],
@@ -175,7 +185,7 @@ try {
   assert.deepEqual(incompatible.agentCapabilities, {});
   const initialized = await active.request("initialize", initialize);
   assert.equal(initialized.agentInfo.name, "pidancr");
-  assert.equal(initialized.agentInfo.title, "Pidancr");
+  assert.equal(initialized.agentInfo.title, "pi (pidancr)");
   assert.equal(initialized.agentInfo.version, version);
   assert.deepEqual(initialized.agentCapabilities.sessionCapabilities, { resume: {}, close: {} });
   const empty = await active.request("session/new", { cwd, mcpServers: [] });
@@ -221,15 +231,54 @@ try {
   });
   await turn(active, naming.sessionId, "Name this session.", "TITLE");
   await active.request("session/close", { sessionId: naming.sessionId });
+  await active.stop();
+  const extension = join(scratch, "permission-fixture.ts");
+  await writeFile(extension, `export default function (pi) {
+    pi.on("before_agent_start", async (event, ctx) => {
+      const confirmed = await ctx.ui.confirm(event.prompt, "Native QA dialog");
+      return { systemPrompt: event.systemPrompt + "\\nNATIVE_CONFIRM_" + confirmed };
+    });
+  }\n`);
+  active = start(extension);
+  await active.request("initialize", initialize);
+  const left = await active.request("session/new", { cwd, mcpServers: [] });
+  const right = await active.request("session/new", { cwd: other, mcpServers: [] });
+  const leftTurn = active.request("session/prompt", {
+    sessionId: left.sessionId, prompt: [{ type: "text", text: "Permission A" }],
+  });
+  const rightTurn = active.request("session/prompt", {
+    sessionId: right.sessionId, prompt: [{ type: "text", text: "Permission B" }],
+  });
+  const permissionDeadline = Date.now() + 10_000;
+  while (active.permissions.length < 2 && Date.now() < permissionDeadline) await delay(20);
+  assert.equal(active.permissions.length, 2);
+  const leftPermission = active.permissions.find((request) => request.params.sessionId === left.sessionId);
+  const rightPermission = active.permissions.find((request) => request.params.sessionId === right.sessionId);
+  assert.ok(leftPermission && rightPermission);
+  assert.notEqual(leftPermission.id, rightPermission.id, "permission IDs collide across sessions");
+  active.respondPermission(rightPermission.id, "no");
+  active.respondPermission(leftPermission.id, "yes");
+  assert.equal((await leftTurn).stopReason, "end_turn");
+  assert.equal((await rightTurn).stopReason, "end_turn");
+  for (const [prompt, confirmed] of [["Permission A", true], ["Permission B", false]]) {
+    const request = requests.slice(5).find((request) =>
+      request.messages.some((message) => JSON.stringify(message.content).includes(prompt)));
+    assert.ok(request, `missing model request for ${prompt}`);
+    assert.ok(request.messages.some((message) =>
+      message.role === "system" && message.content.includes(`NATIVE_CONFIRM_${confirmed}`)));
+  }
+  await active.request("session/close", { sessionId: left.sessionId });
+  await active.request("session/close", { sessionId: right.sessionId });
   const providerSha256 = createHash("sha256").update(await readFile(options["--provider"])).digest("hex");
   await writeFile(options["--output"], JSON.stringify({
     passed: true, target, version, provider_id: initialized.agentInfo.name,
+    provider_name: initialized.agentInfo.title,
     pi_version: piVersion, provider_sha256: providerSha256,
     checks: ["identity", "discovery", "ACP v1", "model selection", "empty-session absence", "streaming", "usage",
       "durable resume", "workspace isolation", "duplicate resume rejection", "cancellation",
-      "close while prompting", "auto naming"],
+      "close while prompting", "auto naming", "concurrent permission routing"],
   }, null, 2) + "\n", { flag: "wx" });
-  console.log(`Native QA passed: ${target}, Pi ${piVersion}, connector ${version}; 5 local model requests.`);
+  console.log(`Native QA passed: ${target}, Pi ${piVersion}, connector ${version}; 7 local model requests.`);
 } finally {
   await active?.stop();
   for (const socket of sockets) socket.destroy();

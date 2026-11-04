@@ -2,8 +2,8 @@
   "schema_version": 1,
   "agent": {
     "id": "pidancr",
-    "name": "Pidancr",
-    "version": "0.2.0",
+    "name": "pi (pidancr)",
+    "version": "0.2.1",
     "description": "Pi coding agent, bridged to Cadencr through its native RPC mode (pi --mode rpc).",
     "repository": "https://github.com/edjubert/cadencr-plugin-provider-pi",
     "website": "https://github.com/earendil-works/pi",

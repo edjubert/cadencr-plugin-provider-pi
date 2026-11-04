@@ -227,7 +227,7 @@ fn handle_initialize(params: &Value) -> AcpResult {
         "agentCapabilities": capabilities,
         "agentInfo": {
             "name": "pidancr",
-            "title": "Pidancr",
+            "title": "pi (pidancr)",
             "version": env!("CARGO_PKG_VERSION"),
         },
     }))

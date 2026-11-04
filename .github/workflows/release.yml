@@ -68,7 +68,9 @@ jobs:
         working-directory: dist/cadencr
         run: node scripts/cargo-env.mjs cargo build --locked -p cadencr-cli
       - name: Install the audited native Pi runtime
-        run: npm install --prefix dist/pi --no-audit --no-fund @earendil-works/pi-coding-agent@0.85.1
+        run: npm install --prefix dist/pi --no-audit --no-fund @earendil-works/pi-coding-agent@1.5.0
+      - name: Audit native Pi production dependencies
+        run: npm audit --prefix dist/pi --omit=dev --audit-level=low
       - name: Prepare and validate a reproducible archive
         run: |
           python scripts/package-release.py package \
@@ -166,7 +168,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" --verify-tag --title "Pidancr $RELEASE_TAG" \
+          gh release create "$RELEASE_TAG" --verify-tag --draft --title "pi (pidancr) $RELEASE_TAG" \
             --notes-file dist/release/RELEASE_NOTES.md \
             dist/release/provider-*.tar.gz dist/release/package.json \
             dist/release/submission.json dist/release/SHA256SUMS dist/release/native-qa.json
+          gh release edit "$RELEASE_TAG" --draft=false
+          test "$(gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG" --jq .immutable)" = true

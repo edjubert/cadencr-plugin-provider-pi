@@ -43,8 +43,6 @@ pub struct PiSession {
     turn_end_tx: Arc<Mutex<Option<oneshot::Sender<String>>>>,
     /// Shared pending-permission map (owned by the ACP server).
     pending_permissions: PendingPermissions,
-    /// Counter for generating unique permission request IDs.
-    permission_req_id: Arc<AtomicU64>,
     auto_name: bool,
     /// Background event loop task handle.
     event_task: Option<tokio::task::JoinHandle<()>>,
@@ -115,7 +113,6 @@ impl PiSession {
             next_update_seq: Arc::new(AtomicU64::new(0)),
             turn_end_tx: Arc::new(Mutex::new(None)),
             pending_permissions,
-            permission_req_id: Arc::new(AtomicU64::new(1)),
             auto_name,
             event_task: None,
         })
@@ -177,7 +174,6 @@ impl PiSession {
             next_update_seq: Arc::new(AtomicU64::new(0)),
             turn_end_tx: Arc::new(Mutex::new(None)),
             pending_permissions,
-            permission_req_id: Arc::new(AtomicU64::new(1)),
             auto_name: false,
             event_task: None,
         })
@@ -289,7 +285,6 @@ impl PiSession {
         let session_id = self.session_id.clone();
         let turn_end_tx = self.turn_end_tx.clone();
         let pending_permissions = self.pending_permissions.clone();
-        let permission_req_id = self.permission_req_id.clone();
         let next_update_seq = self.next_update_seq.clone();
         let context_window = self.context_window.clone();
 
@@ -350,7 +345,6 @@ impl PiSession {
                             session_id.clone(),
                             event,
                             pending_permissions.clone(),
-                            permission_req_id.clone(),
                         ));
                         continue;
                     }

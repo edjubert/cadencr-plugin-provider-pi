@@ -125,8 +125,9 @@ def assemble(args):
         native = read_json(folder / "native-qa.json")
         if (
             native["target"] != target or native["passed"] is not True
-            or native["pi_version"] != "0.85.1"
+            or native["pi_version"] != "1.5.0"
             or native["provider_id"] != package["agent"]["id"]
+            or native["provider_name"] != package["agent"]["name"]
         ):
             raise ValueError(f"Missing native qualification for {target}")
         comparison = json.loads(json.dumps(candidate))

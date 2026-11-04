@@ -1,38 +1,21 @@
-# Pidancr 0.2.0 compatibility qualification
+# pi (pidancr) 0.2.1 compatibility qualification
 
-Provider ID: `pidancr`. Display name: **Pidancr**. Publisher: `edjubert`.
+Provider ID: `pidancr`. Display name: **pi (pidancr)**. Publisher: `edjubert`.
 Minimum app version: `0.16.0`.
 
-The previous author publication and tag were withdrawn before registry acceptance.
-Version `0.2.0` was republished as
-[Pidancr](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.0)
-on **2026-11-03**; no archived release is retained.
+Version `0.2.1` updates the displayed name, native permission routing and
+release immutability. Existing `pidancr-v1.` session IDs are retained.
 [Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
-is ready for review and contains only the two `pidancr` contribution files.
+remains the admission request for this new provider identity.
 
 ## Release qualification
 
-- Qualified source commit: `57612d267c10a2b9c443ed1919118cd1a1a6bc14`.
-- Signed tag `v0.2.0` verified locally and confirmed to resolve to that commit.
-- [Passing CI and final assembly](https://github.com/edjubert/cadencr-plugin-provider-pi/actions/runs/41730300061).
-
-| Native platform | Rust checks | Reproducible packaging | Extracted archive with actual Pi |
-| --- | --- | --- | --- |
-| macOS arm64 | Passed | Passed | Passed |
-| macOS Intel | Passed | Passed | Passed |
-| Linux arm64, Ubuntu 24.04 | Passed | Passed | Passed |
-| Linux x86-64, Ubuntu 24.04 | Passed | Passed | Passed |
-
-All eight public release assets were downloaded without authentication and
-matched the qualified CI bytes and GitHub asset digests. Archive SHA-256 values,
-executable digests and the `pidancr` native evidence matched the package and
-published [SHA256SUMS](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/download/v0.2.0/SHA256SUMS).
-The [native evidence](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/download/v0.2.0/native-qa.json)
-records the checks for each target.
-
-The registry package and submission are byte-for-byte copies of the verified
-public assets. Metadata, submission and complete base/candidate validation
-passed using the pinned registry CLI source below.
+The release workflow must qualify all four native targets before publication.
+Its `marketplace-release` artifact binds each archive/executable hash, provider
+ID, displayed name and Pi `1.5.0` native evidence to the exact source commit.
+Publication requires a signed `v0.2.1` tag, the reviewed CI bytes, a successful
+public-download verification and GitHub's server-side `immutable: true`.
+The registry package and submission must be byte-for-byte copies of those assets.
 
 ## Tooling and contracts
 
@@ -45,11 +28,12 @@ Registry validation uses the pinned CLI source
 | Contract | Implementation |
 | --- | --- |
 | Distinct marketplace identity | `pidancr` / `edjubert`, separate from official `pi` |
-| Descriptor, package and ACP identity | `pidancr`, **Pidancr**, version `0.2.0` |
+| Descriptor, package and ACP identity | `pidancr`, **pi (pidancr)**, version `0.2.1` |
 | Native session identity | Canonical workspace-bound `pidancr-v1.` IDs |
 | Native runtime discovery | `PI_COMMAND`, with legacy local `CADENCR_PI_COMMAND` fallback |
 | ACP lifecycle | ACP v1, durable resume, close and explicit missing-session errors |
 | Discovery and live model arguments | Same validated arguments passed to native Pi |
+| Extension permissions | Unique process-wide request IDs for independently answered concurrent sessions |
 | Packaging and source binding | Allowlisted staging, canonical reproducible archives and source-pinned submission |
 
 ## Local checks
@@ -60,20 +44,26 @@ Registry validation uses the pinned CLI source
 | Release binary | Built |
 | Workflow and script syntax | Passed |
 | Canonical descriptor/package validation and packaging twice | Passed; identical archive digests |
-| Extracted macOS arm64 archive with actual Pi `0.85.1` and Node `22.19.0` | Passed |
+| Extracted macOS arm64 archive with actual Pi `1.5.0` and Node `22.19.0` | Passed |
+| Concurrent extension confirmations | Reproduced the collision before the fix; opposite responses reach their respective sessions after it |
+| RustSec audit of `Cargo.lock` | No known vulnerabilities or informational warnings |
+| Pi `1.5.0` production dependency audit | No reported vulnerabilities |
 
-The native fixture uses isolated configuration/session storage and five inert
+The native fixture uses isolated configuration/session storage and seven inert
 HTTP model requests on `127.0.0.1`, without personal credentials. It checks the
 provider identity, model discovery, ACP negotiation, model selection, missing
 empty sessions, streaming/usage, restart/resume, workspace isolation, duplicate
-resume rejection, cancellation, close during a prompt and automatic naming.
-Assembly requires matching provider ID, archive/executable digests and native
+resume rejection, cancellation, close during a prompt, automatic naming and
+two concurrent extension confirmation dialogs with opposite responses.
+Assembly requires matching provider ID/name, archive/executable digests and native
 evidence for every declared target.
+See the [author security review](SECURITY_REVIEW.md) for scope and audit provenance.
 
 ## Registry acceptance and limits
 
-The [registry workflow](https://github.com/merkr-software/cadencr-registry/actions/runs/41732178470)
-reports `action_required`, pending maintainer intervention. Linux qualification
+Both checks in the [registry workflow for the previous candidate](https://github.com/merkr-software/cadencr-registry/actions/runs/41732178470)
+passed on **2026-11-04**. The revised `0.2.1` contribution requires checks and
+maintainer review against its new exact head. Linux qualification
 uses Ubuntu 24.04/GNU libc; older distributions and Windows are not qualified.
 A signed marketplace installation and packaged-app lifecycle have not been
 exercised. Registry acceptance, mirroring and signed catalog publication remain

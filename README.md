@@ -1,4 +1,4 @@
-# Pidancr
+# pi (pidancr)
 
 <p align="center">
   <img src="icon.svg" alt="Cadencr + Pi" width="256" height="256">
@@ -28,13 +28,13 @@ pi
 ```
 
 The connector and Cadencr never collect, store, or broker Pi credentials.
-Pi `0.85.1` is the version audited by the release's native protocol QA.
+Pi `1.5.0` is the version audited by the release's native protocol QA.
 
 ## Install the Pi CLI
 
 ```bash
 # Via npm
-npm install -g @earendil-works/pi-coding-agent@0.85.1
+npm install -g @earendil-works/pi-coding-agent@1.5.0
 
 # Or see https://github.com/earendil-works/pi for other install methods
 ```
@@ -61,7 +61,7 @@ Node is needed by Pi only.
 
 ## CadencR 0.16.0 marketplace
 
-The independent provider is named **Pidancr** with ID `pidancr`,
+The independent provider is named **pi (pidancr)** with ID `pidancr`,
 publisher `edjubert`, and minimum app version `0.16.0`. The marketplace's
 official `pi` connector is a separate implementation.
 
@@ -71,8 +71,9 @@ The repository's GitHub Actions workflow produces the reviewable release bundle;
 publishing the author release and accepting the registry contribution are
 separate steps.
 
-The [Pidancr v0.2.0 release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.0)
-is published for macOS and Linux on Intel/x86-64 and arm64.
+Version `0.2.1` uses this label in marketplace metadata and ACP while retaining
+the `pidancr` identity and existing workspace-bound session IDs.
+Native release targets are macOS and Linux on Intel/x86-64 and arm64.
 [Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
 is awaiting maintainer acceptance before marketplace listing.
 

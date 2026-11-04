@@ -1,13 +1,13 @@
 # Marketplace release
 
-This repository's first marketplace version is **0.2.0**, compatible with
-**CadencR >=0.16.0**. Its provider ID is `pidancr`, display name is **Pidancr**
+This repository's marketplace candidate is **0.2.1**, compatible with
+**CadencR >=0.16.0**. Its provider ID is `pidancr`, display name is **pi (pidancr)**
 and publisher is `edjubert`.
 The official registry already owns `pi` under publisher `cadencr`; that identity
 cannot be transferred through a normal version submission.
 
-The [Pidancr v0.2.0 release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.0)
-is published and its public assets are verified.
+Version `0.2.0` was published and reviewed. The updated label is released as
+`0.2.1` with new archives and a new signed tag.
 [Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
 is ready for review. Marketplace availability requires maintainer
 acceptance and signed catalog publication. See [qualification results](QA.md).
@@ -20,7 +20,8 @@ only by the packaging script; it is not installable metadata.
 The GitHub workflow builds native binaries on macOS arm64/Intel and Linux
 arm64/x86-64. Each runner validates the local descriptor, packages twice with
 CadencR's canonical Rust CLI, checks identical digests, and executes the
-**extracted archive** against actual Pi `0.85.1` and a local model fixture.
+**extracted archive** against actual Pi `1.5.0` and a local model fixture.
+Production dependencies of this external runtime must pass `npm audit`.
 Only passing targets enter the final `package.json` and `submission.json`.
 Windows is not declared.
 Linux binaries are built and tested on Ubuntu 24.04 with GNU libc; compatibility
@@ -48,7 +49,8 @@ node scripts/native-qa.mjs \
 The QA fixture uses isolated config/session directories and no personal
 credentials. It exercises discovery, negotiation, model selection, missing
 empty-session handling, streaming, usage, restart/resume, workspace isolation,
-cancellation, close during an active prompt and automatic naming. It retains its scratch directory
+cancellation, close during an active prompt, automatic naming and independent
+confirmations in two simultaneous sessions. It retains its scratch directory
 under the system temporary directory.
 
 ## Publish and submit
@@ -58,17 +60,21 @@ under the system temporary directory.
 2. Review the successful run's `marketplace-release` artifact: all archives,
    `package.json`, `submission.json`, `SHA256SUMS`, native QA evidence and notes.
    Confirm that the submission pins the exact tested source commit.
-3. Tag that commit as `v0.2.0` and push the tag. After publication authorization,
-   either publish the reviewed bundle with `gh release create --verify-tag`,
+3. Ensure GitHub immutable releases are enabled for the author repository.
+   Tag that commit as `v0.2.1` and push the tag. After publication authorization,
+   either publish the reviewed bundle with `gh release create --verify-tag --draft`,
+   upload all assets and publish the draft with `gh release edit --draft=false`,
    or dispatch the same tag with `publish` checked to qualify and publish a new
    bundle through the workflow. An existing release is refused; assets are not
-   overwritten.
-4. Verify the downloaded public archive hashes against `SHA256SUMS`.
+   overwritten. Confirm GitHub reports `immutable: true` for the published release;
+   this locks its assets and tag on the server.
+4. Verify every downloaded public asset against the qualified CI bundle and
+   the archive hashes against `SHA256SUMS`.
 5. In a personal fork of `merkr-software/cadencr-registry`, add:
 
    ```text
-   packages/pidancr-0.2.0.json      ← package.json
-   submissions/pidancr-0.2.0.json   ← submission.json
+   packages/pidancr-0.2.1.json      ← package.json
+   submissions/pidancr-0.2.1.json   ← submission.json
    ```
 
 6. Run `cadencr registry validate --base <accepted-registry> --candidate <fork>`,
