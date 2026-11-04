@@ -6,10 +6,11 @@ and publisher is `edjubert`.
 The official registry already owns `pi` under publisher `cadencr`; that identity
 cannot be transferred through a normal version submission.
 
-Version `0.2.0` was published and reviewed. The updated label is released as
-`0.2.1` with new archives and a new signed tag.
+The [pi (pidancr) v0.2.1 release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.1)
+is published with a signed tag and GitHub's server-side `immutable: true`.
+All eight public assets match the qualified CI bundle byte-for-byte.
 [Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
-is ready for review. Marketplace availability requires maintainer
+is the admission request. Marketplace availability requires maintainer
 acceptance and signed catalog publication. See [qualification results](QA.md).
 
 The package template is an authoring input. Its empty platform map is filled

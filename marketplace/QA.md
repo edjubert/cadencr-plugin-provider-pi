@@ -10,12 +10,33 @@ remains the admission request for this new provider identity.
 
 ## Release qualification
 
-The release workflow must qualify all four native targets before publication.
-Its `marketplace-release` artifact binds each archive/executable hash, provider
-ID, displayed name and Pi `1.5.0` native evidence to the exact source commit.
-Publication requires a signed `v0.2.1` tag, the reviewed CI bytes, a successful
-public-download verification and GitHub's server-side `immutable: true`.
-The registry package and submission must be byte-for-byte copies of those assets.
+- Qualified source: `5a28d3feda63ac8ed327d3696a7f48e21f5639d3`.
+- Signed annotated tag `v0.2.1` verified locally and by GitHub, resolving to that source.
+- [Passing author CI and assembly](https://github.com/edjubert/cadencr-plugin-provider-pi/actions/runs/41814529310).
+- [Published release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.1):
+  **2026-11-04**, GitHub reports **`immutable: true`**.
+- Verified `marketplace-release` artifact `13314481859`, ZIP SHA-256
+  `ff718cd3c33f12c5baf99196ccb7a6968c8c12fb015d49660ab0fffcbfa35501`.
+
+| Native platform | Rust checks | Reproducible packaging | Pi 1.5.0 native QA and dependency audit |
+| --- | --- | --- | --- |
+| macOS arm64 | Passed | Passed | Passed |
+| macOS Intel | Passed | Passed | Passed |
+| Linux arm64, Ubuntu 24.04 | Passed | Passed | Passed |
+| Linux x86-64, Ubuntu 24.04 | Passed | Passed | Passed |
+
+All eight public assets were downloaded without authentication at
+`2026-11-04T10:41:35.972619+00:00` and matched the qualified CI bytes, GitHub
+asset digests, archive checksums and executable hashes. Archive documentation,
+license, notices and icon match the declared source's Git blobs.
+The [SHA256SUMS](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/download/v0.2.1/SHA256SUMS)
+and [native evidence](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/download/v0.2.1/native-qa.json)
+are published with the release.
+
+[Registry contribution commit `b9d577c`](https://github.com/edjubert/cadencr-registry/commit/b9d577c56ee032f8b7b6ee3dbe2c39c13ba6fb84)
+contains byte-for-byte copies of the publicly downloaded `package.json` and
+`submission.json`. Local metadata, submission and complete base/candidate
+validation passed with the pinned registry CLI below.
 
 ## Tooling and contracts
 
@@ -61,10 +82,15 @@ See the [author security review](SECURITY_REVIEW.md) for scope and audit provena
 
 ## Registry acceptance and limits
 
-Both checks in the [registry workflow for the previous candidate](https://github.com/merkr-software/cadencr-registry/actions/runs/41732178470)
-passed on **2026-11-04**. The revised `0.2.1` contribution requires checks and
-maintainer review against its new exact head. Linux qualification
-uses Ubuntu 24.04/GNU libc; older distributions and Windows are not qualified.
+The `0.2.1` contribution is pushed to the registry fork, and PR #22's title and
+description reference this release. During verification on **2026-11-04**,
+GitHub's ongoing PR incident still reports the previous head in PR #22,
+delaying its new workflow. The previous candidate's green checks do not
+qualify contribution `b9d577c`; trusted registry checks and maintainer review
+remain required.
+
+Linux qualification uses Ubuntu 24.04/GNU libc; older distributions and Windows
+are not qualified.
 A signed marketplace installation and packaged-app lifecycle have not been
 exercised. Registry acceptance, mirroring and signed catalog publication remain
 required before marketplace listing.

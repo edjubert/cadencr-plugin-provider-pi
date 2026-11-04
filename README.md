@@ -71,9 +71,12 @@ The repository's GitHub Actions workflow produces the reviewable release bundle;
 publishing the author release and accepting the registry contribution are
 separate steps.
 
-Version `0.2.1` uses this label in marketplace metadata and ACP while retaining
-the `pidancr` identity and existing workspace-bound session IDs.
-Native release targets are macOS and Linux on Intel/x86-64 and arm64.
+The [pi (pidancr) v0.2.1 release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.1)
+is published with immutable assets and a signed tag. It uses this label in
+marketplace metadata and ACP while retaining the `pidancr` identity and
+existing workspace-bound session IDs.
+All four native targets (macOS and Linux on Intel/x86-64 and arm64) passed
+[release qualification](https://github.com/edjubert/cadencr-plugin-provider-pi/actions/runs/41814529310).
 [Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
 is awaiting maintainer acceptance before marketplace listing.
 
