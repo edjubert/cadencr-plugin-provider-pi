@@ -213,8 +213,8 @@ fn handle_initialize(params: &Value) -> AcpResult {
             "loadSession": true,
         },
         "agentInfo": {
-            "name": "cadencr-plugin-provider-pi",
-            "title": "Cadencr Pi connector",
+            "name": "pi",
+            "title": "Pi",
             "version": env!("CARGO_PKG_VERSION"),
         },
     }))
