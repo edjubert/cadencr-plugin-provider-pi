@@ -37,7 +37,7 @@ def digest(path):
 
 def identity():
     package = read_json(ROOT / "marketplace/package-template.json")
-    descriptor = read_json(ROOT / "descriptor/pidancr.json")
+    descriptor = read_json(ROOT / "descriptor/pi.json")
     version = tomllib.loads((ROOT / "Cargo.toml").read_text())["package"]["version"]
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise ValueError("Release version must be an exact stable semantic version")
@@ -64,11 +64,11 @@ def prepare(args):
         (stage / name).chmod(0o644)
     descriptor["installation"]["executable"] = {"command": str(stage / "bin/provider")}
     descriptor["installation"]["assets"] = {"directory": str(stage)}
-    descriptor_path = args.output / "pidancr.json"
+    descriptor_path = args.output / "pi.json"
     write_json(descriptor_path, descriptor)
     run(str(args.cli), "plugin", "validate", str(stage), "--descriptor", str(descriptor_path))
     version = package["agent"]["version"]
-    name = f"provider-pidancr-{version}-{args.target}.tar.gz"
+    name = f"provider-pi-{version}-{args.target}.tar.gz"
     package["agent"]["distribution"]["binary"] = {
         args.target: {
             "archive": f'{package["agent"]["repository"]}/releases/download/v{version}/{name}',
@@ -137,7 +137,7 @@ def assemble(args):
         if comparison != expected or set(candidate["agent"]["distribution"]["binary"]) != {target}:
             raise ValueError(f"Inconsistent package metadata for {target}")
         entry = candidate["agent"]["distribution"]["binary"][target]
-        archive_name = f"provider-pidancr-{version}-{target}.tar.gz"
+        archive_name = f"provider-pi-{version}-{target}.tar.gz"
         archive = folder / archive_name
         if digest(archive) != entry["sha256"]:
             raise ValueError(f"Archive integrity failed for {target}")
@@ -170,7 +170,7 @@ def assemble(args):
     run(str(args.cli), "registry", "validate-submission", str(submission_path))
     (args.output / "SHA256SUMS").write_text("".join(sums))
     shutil.copyfile(args.changelog, args.output / "RELEASE_NOTES.md")
-    print(f"Prepared pidancr {version}: {', '.join(sorted(args.targets))}")
+    print(f"Prepared pi {version}: {', '.join(sorted(args.targets))}")
 
 
 def main():

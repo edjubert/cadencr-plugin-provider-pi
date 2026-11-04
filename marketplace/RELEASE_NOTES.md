@@ -1,9 +1,11 @@
-## pi (pidancr) 0.2.1
+## Pi 0.5.0
 
-- Display the connector as **pi (pidancr)** in marketplace metadata, local
-  descriptors and ACP initialization so users can find it by the Pi name.
-  The provider ID remains `pidancr`, publisher remains `edjubert`, and
-  workspace-bound `pidancr-v1.` session identities are unchanged.
+- Register the connector under the `pi` provider ID with display name **Pi**
+  in marketplace metadata, local descriptors and ACP initialization. The
+  registry handed the `pi` namespace over to this connector after retiring
+  its first-party `pi` plugin (registry PR #22). Publisher remains
+  `edjubert`, and workspace-bound `pidancr-v1.` session identities are
+  unchanged.
 - Publish new versioned archives through GitHub's immutable-release protection.
   Publication checks the server-side `immutable` flag after all draft assets
   have been uploaded and the release has been published.

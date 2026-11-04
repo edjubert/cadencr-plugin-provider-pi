@@ -168,7 +168,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" --verify-tag --draft --title "pi (pidancr) $RELEASE_TAG" \
+          gh release create "$RELEASE_TAG" --verify-tag --draft --title "Pi $RELEASE_TAG" \
             --notes-file dist/release/RELEASE_NOTES.md \
             dist/release/provider-*.tar.gz dist/release/package.json \
             dist/release/submission.json dist/release/SHA256SUMS dist/release/native-qa.json

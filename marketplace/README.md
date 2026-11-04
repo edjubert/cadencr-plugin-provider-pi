@@ -1,12 +1,14 @@
 # Marketplace release
 
-This repository's marketplace candidate is **0.2.1**, compatible with
-**CadencR >=0.16.0**. Its provider ID is `pidancr`, display name is **pi (pidancr)**
+This repository's marketplace candidate is **0.5.0**, compatible with
+**CadencR >=0.16.0**. Its provider ID is `pi`, display name is **Pi**
 and publisher is `edjubert`.
-The official registry already owns `pi` under publisher `cadencr`; that identity
-cannot be transferred through a normal version submission.
+The `pi` provider namespace was handed over to this connector by the registry
+maintainers, who retired their first-party `pi` plugin (see
+[registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)),
+so the candidate registers as `pi`.
 
-The [pi (pidancr) v0.2.1 release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.1)
+The [Pi v0.5.0 release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.5.0)
 is published with a signed tag and GitHub's server-side `immutable: true`.
 All eight public assets match the qualified CI bundle byte-for-byte.
 [Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
@@ -62,7 +64,7 @@ under the system temporary directory.
    `package.json`, `submission.json`, `SHA256SUMS`, native QA evidence and notes.
    Confirm that the submission pins the exact tested source commit.
 3. Ensure GitHub immutable releases are enabled for the author repository.
-   Tag that commit as `v0.2.1` and push the tag. After publication authorization,
+   Tag that commit as `v0.5.0` and push the tag. After publication authorization,
    either publish the reviewed bundle with `gh release create --verify-tag --draft`,
    upload all assets and publish the draft with `gh release edit --draft=false`,
    or dispatch the same tag with `publish` checked to qualify and publish a new
@@ -74,8 +76,8 @@ under the system temporary directory.
 5. In a personal fork of `merkr-software/cadencr-registry`, add:
 
    ```text
-   packages/pidancr-0.2.1.json      ← package.json
-   submissions/pidancr-0.2.1.json   ← submission.json
+   packages/pi-0.5.0.json      ← package.json
+   submissions/pi-0.5.0.json   ← submission.json
    ```
 
 6. Run `cadencr registry validate --base <accepted-registry> --candidate <fork>`,

@@ -1,19 +1,20 @@
-# pi (pidancr) 0.2.1 compatibility qualification
+# Pi 0.5.0 compatibility qualification
 
-Provider ID: `pidancr`. Display name: **pi (pidancr)**. Publisher: `edjubert`.
+Provider ID: `pi`. Display name: **Pi**. Publisher: `edjubert`.
 Minimum app version: `0.16.0`.
 
-Version `0.2.1` updates the displayed name, native permission routing and
-release immutability. Existing `pidancr-v1.` session IDs are retained.
+Version `0.5.0` registers the provider under the `pi` ID (namespace handed
+over by `cadencr`) with display name **Pi**. Existing `pidancr-v1.` session
+IDs are retained.
 [Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
 remains the admission request for this new provider identity.
 
 ## Release qualification
 
 - Qualified source: `5a28d3feda63ac8ed327d3696a7f48e21f5639d3`.
-- Signed annotated tag `v0.2.1` verified locally and by GitHub, resolving to that source.
+- Signed annotated tag `v0.5.0` verified locally and by GitHub, resolving to that source.
 - [Passing author CI and assembly](https://github.com/edjubert/cadencr-plugin-provider-pi/actions/runs/41814529310).
-- [Published release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.1):
+- [Published release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.5.0):
   **2026-11-04**, GitHub reports **`immutable: true`**.
 - Verified `marketplace-release` artifact `13314481859`, ZIP SHA-256
   `ff718cd3c33f12c5baf99196ccb7a6968c8c12fb015d49660ab0fffcbfa35501`.
@@ -29,8 +30,8 @@ All eight public assets were downloaded without authentication at
 `2026-11-04T10:41:35.972619+00:00` and matched the qualified CI bytes, GitHub
 asset digests, archive checksums and executable hashes. Archive documentation,
 license, notices and icon match the declared source's Git blobs.
-The [SHA256SUMS](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/download/v0.2.1/SHA256SUMS)
-and [native evidence](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/download/v0.2.1/native-qa.json)
+The [SHA256SUMS](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/download/v0.5.0/SHA256SUMS)
+and [native evidence](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/download/v0.5.0/native-qa.json)
 are published with the release.
 
 [Registry contribution commit `b9d577c`](https://github.com/edjubert/cadencr-registry/commit/b9d577c56ee032f8b7b6ee3dbe2c39c13ba6fb84)
@@ -48,8 +49,8 @@ Registry validation uses the pinned CLI source
 
 | Contract | Implementation |
 | --- | --- |
-| Distinct marketplace identity | `pidancr` / `edjubert`, separate from official `pi` |
-| Descriptor, package and ACP identity | `pidancr`, **pi (pidancr)**, version `0.2.1` |
+| Marketplace identity | `pi` / `edjubert`, namespace handed over by `cadencr` (registry PR #22) |
+| Descriptor, package and ACP identity | `pi`, **Pi**, version `0.5.0` |
 | Native session identity | Canonical workspace-bound `pidancr-v1.` IDs |
 | Native runtime discovery | `PI_COMMAND`, with legacy local `CADENCR_PI_COMMAND` fallback |
 | ACP lifecycle | ACP v1, durable resume, close and explicit missing-session errors |
@@ -82,7 +83,7 @@ See the [author security review](SECURITY_REVIEW.md) for scope and audit provena
 
 ## Registry acceptance and limits
 
-The `0.2.1` contribution is pushed to the registry fork, and PR #22's title and
+The `0.5.0` contribution is pushed to the registry fork, and PR #22's title and
 description reference this release. During verification on **2026-11-04**,
 GitHub's ongoing PR incident still reports the previous head in PR #22,
 delaying its new workflow. The previous candidate's green checks do not

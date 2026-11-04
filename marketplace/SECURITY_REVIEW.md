@@ -1,4 +1,4 @@
-# Author security review — pi (pidancr) 0.2.1
+# Author security review — Pi 0.5.0
 
 This report documents author-side checks performed on **2026-11-04**.
 Registry maintainer approval and explicit admission authorization remain

@@ -23,7 +23,7 @@ const target = `${{ darwin: "darwin", linux: "linux" }[process.platform]}-${{
   arm64: "aarch64", x64: "x86_64",
 }[process.arch]}`;
 assert.ok(["darwin-aarch64", "darwin-x86_64", "linux-aarch64", "linux-x86_64"].includes(target));
-const scratch = await mkdtemp(join(tmpdir(), "pidancr-native-"));
+const scratch = await mkdtemp(join(tmpdir(), "pi-native-"));
 const home = join(scratch, "home");
 const agent = join(scratch, "agent");
 const cwd = join(scratch, "workspace");
@@ -184,8 +184,8 @@ try {
   assert.equal(incompatible.protocolVersion, 1);
   assert.deepEqual(incompatible.agentCapabilities, {});
   const initialized = await active.request("initialize", initialize);
-  assert.equal(initialized.agentInfo.name, "pidancr");
-  assert.equal(initialized.agentInfo.title, "pi (pidancr)");
+  assert.equal(initialized.agentInfo.name, "pi");
+  assert.equal(initialized.agentInfo.title, "Pi");
   assert.equal(initialized.agentInfo.version, version);
   assert.deepEqual(initialized.agentCapabilities.sessionCapabilities, { resume: {}, close: {} });
   const empty = await active.request("session/new", { cwd, mcpServers: [] });

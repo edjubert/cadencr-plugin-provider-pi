@@ -1,4 +1,4 @@
-# pi (pidancr)
+# Pi
 
 <p align="center">
   <img src="icon.svg" alt="Cadencr + Pi" width="256" height="256">
@@ -61,9 +61,10 @@ Node is needed by Pi only.
 
 ## CadencR 0.16.0 marketplace
 
-The independent provider is named **pi (pidancr)** with ID `pidancr`,
-publisher `edjubert`, and minimum app version `0.16.0`. The marketplace's
-official `pi` connector is a separate implementation.
+The provider is named **Pi** with ID `pi`,
+publisher `edjubert`, and minimum app version `0.16.0`. The `pi` provider
+namespace was handed over to this connector when the registry retired its
+first-party `pi` plugin (see [registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)).
 
 See [marketplace release instructions](https://github.com/edjubert/cadencr-plugin-provider-pi/blob/main/marketplace/README.md) for canonical
 packaging, native platform qualification, author release and registry submission.
@@ -71,10 +72,10 @@ The repository's GitHub Actions workflow produces the reviewable release bundle;
 publishing the author release and accepting the registry contribution are
 separate steps.
 
-The [pi (pidancr) v0.2.1 release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.2.1)
-is published with immutable assets and a signed tag. It uses this label in
-marketplace metadata and ACP while retaining the `pidancr` identity and
-existing workspace-bound session IDs.
+The [Pi v0.5.0 release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.5.0)
+is published with immutable assets and a signed tag. It registers under the
+`pi` identity in marketplace metadata and ACP while retaining existing
+workspace-bound session IDs.
 All four native targets (macOS and Linux on Intel/x86-64 and arm64) passed
 [release qualification](https://github.com/edjubert/cadencr-plugin-provider-pi/actions/runs/41814529310).
 [Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
@@ -82,7 +83,7 @@ is awaiting maintainer acceptance before marketplace listing.
 
 ## Local Cadencr install
 
-1. Copy `descriptor/pidancr.json` to `~/.cadencr/settings/providers/pidancr.json`.
+1. Copy `descriptor/pi.json` to `~/.cadencr/settings/providers/pi.json`.
 2. Replace both `/ABSOLUTE/PATH/TO/...` placeholders with this repository's absolute path.
 3. Restart Cadencr. Provider registration is read once at startup; hot reload is not supported.
 
@@ -109,7 +110,7 @@ README.
 Settings default to a `cadencr-settings` directory beside the database file.
 With the standard `pnpm dev` configuration (`CADENCR_DB_PATH=./cadencr.local.db`),
 the service runs from `packages/service`, so install the descriptor at
-`packages/service/cadencr-settings/providers/pidancr.json`.
+`packages/service/cadencr-settings/providers/pi.json`.
 The repository-root `cadencr-settings` directory is not read in this setup.
 An explicit `CADENCR_SETTINGS_DIR` overrides this location.
 
