@@ -5,8 +5,10 @@
 //!
 //! The event loop runs in a background tokio task: it reads Pi RPC
 //! notifications, translates them to ACP `session/update` notifications,
-//! and writes them to stdout. Permission requests from Pi are bridged
-//! to ACP `session/request_permission` requests.
+//! and writes them to stdout. In the session's `ask` mode, permission
+//! requests from Pi are bridged to ACP `session/request_permission`; in
+//! every other mode (set through `session/set_config_option` on the
+//! `mode` option) they are answered locally.
 
 use agent_client_protocol::schema::v1::SessionConfigOption;
 use serde_json::{json, Value};
@@ -36,6 +38,9 @@ pub struct PiSession {
     session_id: String,
     rpc: PiRpc,
     config_options: Vec<SessionConfigOption>,
+    /// Current permission mode, shared with the event loop so dialogs are
+    /// auto-answered in non-ask modes. Updated by `session/set_config_option`.
+    mode: Arc<Mutex<String>>,
     context_window: Arc<AtomicU64>,
     stdout: Arc<Mutex<std::io::Stdout>>,
     next_update_seq: Arc<AtomicU64>,
@@ -65,14 +70,16 @@ impl PiSession {
         }
         // Title generation must not leave a durable Pi session behind.
         let rpc = spawn(&cwd_path, None, auto_name, &pi_args)?;
+        let mode = Arc::new(Mutex::new(crate::discovery::DEFAULT_MODE.to_string()));
 
-        let config_options = match crate::discovery::load_config_options(&rpc).await {
-            Ok(options) => options,
-            Err(error) => {
-                rpc.shutdown().await;
-                return Err(error);
-            }
-        };
+        let config_options =
+            match crate::discovery::load_config_options(&rpc, &mode.lock().await).await {
+                Ok(options) => options,
+                Err(error) => {
+                    rpc.shutdown().await;
+                    return Err(error);
+                }
+            };
         let state = match rpc.get_state().await {
             Ok(state) => state,
             Err(error) => {
@@ -106,6 +113,7 @@ impl PiSession {
             session_id,
             rpc,
             config_options,
+            mode,
             context_window: Arc::new(AtomicU64::new(
                 context_window_for_state(&state).unwrap_or(0),
             )),
@@ -155,18 +163,21 @@ impl PiSession {
             rpc.shutdown().await;
             return Err(format!("Session \"{session_id}\" not found"));
         }
-        let config_options = match crate::discovery::load_config_options(&rpc).await {
-            Ok(options) => options,
-            Err(error) => {
-                rpc.shutdown().await;
-                return Err(error);
-            }
-        };
+        let mode = Arc::new(Mutex::new(crate::discovery::DEFAULT_MODE.to_string()));
+        let config_options =
+            match crate::discovery::load_config_options(&rpc, &mode.lock().await).await {
+                Ok(options) => options,
+                Err(error) => {
+                    rpc.shutdown().await;
+                    return Err(error);
+                }
+            };
 
         Ok(Self {
             session_id: session_id.to_string(),
             rpc,
             config_options,
+            mode,
             context_window: Arc::new(AtomicU64::new(
                 context_window_for_state(&state).unwrap_or(0),
             )),
@@ -225,7 +236,7 @@ impl PiSession {
         Ok(())
     }
 
-    /// Set a config option (model or thinking level).
+    /// Set a config option (model, thinking level or permission mode).
     pub async fn set_config_option(
         &mut self,
         config_id: &str,
@@ -241,12 +252,19 @@ impl PiSession {
             "thinking" => {
                 self.rpc.set_thinking_level(value).await?;
             }
+            crate::discovery::MODE_OPTION_ID => {
+                if crate::discovery::host_permission_mode(value).is_none() {
+                    return Err(format!("unknown mode: {value}"));
+                }
+                *self.mode.lock().await = value.to_string();
+            }
             _ => {
                 return Err(format!("unknown config option: {config_id}"));
             }
         }
 
-        self.config_options = crate::discovery::load_config_options(&self.rpc).await?;
+        let mode = self.mode.lock().await.clone();
+        self.config_options = crate::discovery::load_config_options(&self.rpc, &mode).await?;
         if config_id == "model" {
             let state = self.rpc.get_state().await?;
             let context_window = context_window_for_state(&state).unwrap_or(0);
@@ -285,6 +303,7 @@ impl PiSession {
         let session_id = self.session_id.clone();
         let turn_end_tx = self.turn_end_tx.clone();
         let pending_permissions = self.pending_permissions.clone();
+        let mode = self.mode.clone();
         let next_update_seq = self.next_update_seq.clone();
         let context_window = self.context_window.clone();
 
@@ -345,6 +364,7 @@ impl PiSession {
                             session_id.clone(),
                             event,
                             pending_permissions.clone(),
+                            mode.clone(),
                         ));
                         continue;
                     }

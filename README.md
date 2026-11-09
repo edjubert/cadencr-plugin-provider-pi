@@ -14,7 +14,7 @@ The connector implements the Cadencr provider executable contract:
 | Command | Behavior |
 | --- | --- |
 | `version` | Prints the connector version. |
-| `models --format acp-config-options-v1 --cwd <abs> [Pi args]` | Launches `pi --mode rpc --no-session --no-approve` in the workspace, calls `get_available_models` and `get_state`, and prints the ACP v1 `SessionConfigOption` array. |
+| `models --format acp-config-options-v1 --cwd <abs> [Pi args]` | Launches `pi --mode rpc --no-session --no-approve` in the workspace, calls `get_available_models` and `get_state`, and prints the ACP v1 `SessionConfigOption` array: the `model` selector, a `mode` selector whose choices carry `_meta.cadencr.permissionMode` host mappings, and an optional `thinking` selector. |
 | `run --protocol acp-v1` | Starts an ACP v1 JSON-RPC server over stdio. Each ACP session owns a persistent `pi --mode rpc` child process; Pi events are translated to ACP session updates. |
 
 ## Prerequisites
@@ -162,10 +162,19 @@ pi --mode rpc  (native Pi RPC child)
 
 ## Permissions
 
-Pi has no tool-approval system; tools run without confirmation. Only extension
-dialogs (`select`, `confirm`) are bridged to ACP
-`session/request_permission`. Unsupported `input` and `editor` dialogs are
-cancelled; notifications and status updates are ignored.
+Pi has no tool-approval system; tools run without confirmation. The connector
+declares a `mode` selector (ACP category `mode`) in the `models` output and in
+every live session, with each choice annotated `_meta.cadencr.permissionMode`:
+`ask` → `ask`, `accept-edits` → `acceptEdits`, `smart-approve` → `auto`,
+`auto-approve` → `bypassPermissions`. CadencR maps its permission-mode chip
+onto these values and applies the selected mode to the live session through
+`session/set_config_option`.
+
+In `ask` mode, extension dialogs (`select`, `confirm`) are bridged to ACP
+`session/request_permission`. In every other mode the connector answers them
+itself (confirm → yes, select → first option), so auto-approve is effective
+instead of prompting on every dialog. Unsupported `input` and `editor`
+dialogs are cancelled; notifications and status updates are ignored.
 
 ## Known limitations
 
@@ -186,6 +195,10 @@ cancelled; notifications and status updates are ignored.
 - ACP session IDs bind Pi's native UUID to the canonical workspace.
 - Thinking levels are exposed as a generic ACP select option when Pi
   models advertise multiple levels.
+- The `mode` selector is returned next to the model selector with each choice
+  annotated `_meta.cadencr.permissionMode`, so CadencR maps its mode chip
+  onto the connector's modes and pushes the selected mode to the live session
+  through `session/set_config_option`.
 - Supported release targets must pass native QA on their own runners before
   appearing in marketplace metadata.
 

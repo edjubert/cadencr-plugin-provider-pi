@@ -1,11 +1,18 @@
 //! Bridge Pi extension dialogs (`extension_ui_request`) to ACP
 //! `session/request_permission`.
+//!
+//! In the session's `ask` mode, `confirm`/`select` dialogs are bridged to
+//! the host. In every other mode (accept-edits, smart-approve,
+//! auto-approve) the connector answers them itself, so the mode the host
+//! pushes through `session/set_config_option` is effective instead of
+//! prompting on every dialog.
 use serde_json::{json, Value};
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex};
 
+use crate::discovery::host_permission_mode;
 use crate::pi_rpc::PiRpc;
 use crate::session::PendingPermissions;
 
@@ -107,6 +114,22 @@ pub fn selected_option(response: &Value) -> Option<String> {
         .map(String::from)
 }
 
+/// Whether a session mode auto-answers Pi dialogs instead of asking the
+/// host. Only `ask` (and unmapped values) bridge dialogs to
+/// `session/request_permission`.
+pub fn auto_approves(mode: &str) -> bool {
+    host_permission_mode(mode).is_some_and(|host_id| host_id != "ask")
+}
+
+/// The option id a non-ask mode auto-selects for a dialog: `yes` for a
+/// confirm, the first option for a select.
+pub fn auto_selected(dialog: &Dialog) -> Option<String> {
+    match dialog {
+        Dialog::Confirm { .. } => Some("yes".to_string()),
+        Dialog::Select { options, .. } => options.first().map(|_| "0".to_string()),
+    }
+}
+
 /// Handle one `extension_ui_request`. Meant to be `tokio::spawn`ed: it waits
 /// for the host's decision (up to 300 s) without blocking the event loop.
 pub async fn handle_ui_request(
@@ -115,6 +138,7 @@ pub async fn handle_ui_request(
     session_id: String,
     event: Value,
     pending: PendingPermissions,
+    mode: Arc<Mutex<String>>,
 ) {
     let request_id = event
         .get("id")
@@ -129,6 +153,20 @@ pub async fn handle_ui_request(
         }
         UiRequest::Ask(dialog) => dialog,
     };
+
+    // Non-ask modes answer the dialog locally: the host already pushed its
+    // permission mode, so asking again would prompt on every dialog.
+    let mode = mode.lock().await.clone();
+    if auto_approves(&mode) {
+        let selected = auto_selected(&dialog);
+        respond(
+            &rpc,
+            &request_id,
+            dialog.response_payload(selected.as_deref()),
+        )
+        .await;
+        return;
+    }
 
     let req_id = NEXT_PERMISSION_REQUEST_ID.fetch_add(1, Ordering::SeqCst);
     let (tx, rx) = oneshot::channel::<Value>();
@@ -260,5 +298,35 @@ mod tests {
             None
         );
         assert_eq!(selected_option(&Value::Null), None);
+    }
+
+    #[test]
+    fn only_ask_mode_bridges_dialogs_to_the_host() {
+        assert!(!auto_approves("ask"));
+        assert!(auto_approves("accept-edits"));
+        assert!(auto_approves("smart-approve"));
+        assert!(auto_approves("auto-approve"));
+        assert!(!auto_approves("bogus"));
+    }
+
+    #[test]
+    fn auto_answer_picks_yes_or_the_first_option() {
+        let confirm = Dialog::Confirm {
+            title: "Clear?".into(),
+        };
+        assert_eq!(auto_selected(&confirm).as_deref(), Some("yes"));
+        assert_eq!(
+            confirm.response_payload(auto_selected(&confirm).as_deref()),
+            json!({ "confirmed": true })
+        );
+        let select = Dialog::Select {
+            title: "t".into(),
+            options: vec!["Allow".into(), "Block".into()],
+        };
+        assert_eq!(auto_selected(&select).as_deref(), Some("0"));
+        assert_eq!(
+            select.response_payload(auto_selected(&select).as_deref()),
+            json!({ "value": "Allow" })
+        );
     }
 }

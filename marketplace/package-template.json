@@ -2,7 +2,7 @@
   "agent": {
     "id": "pi",
     "name": "Pi",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "description": "Independent ACP connector for Pi's native RPC mode.",
     "repository": "https://github.com/edjubert/cadencr-plugin-provider-pi",
     "website": "https://github.com/earendil-works/pi",

@@ -2,22 +2,54 @@
 //!
 //! Launches a disposable Pi RPC process in the requested workspace,
 //! calls `get_available_models` and `get_state`, then builds the ACP v1
-//! `SessionConfigOption` array with a `model` select option and an optional
-//! `thinking` select option.
+//! `SessionConfigOption` array with a `model` select option, a `mode`
+//! select option annotated with `_meta.cadencr.permissionMode`, and an
+//! optional `thinking` select option.
 //!
 //! The host terminates `models` after 10 seconds, so discovery stays
 //! under an 8-second budget.
 
 use agent_client_protocol::schema::v1::{
     SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelectOption,
-    SessionConfigSelectOptions,
+    SessionConfigSelectOptions, SessionConfigValueId,
 };
+use serde_json::Value;
 use std::path::Path;
 use std::time::Duration;
 
 use crate::pi_rpc::{spawn, PiModel, PiRpc, PiState};
 
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(8);
+
+/// Config option id of the mode selector.
+pub const MODE_OPTION_ID: &str = "mode";
+
+/// Mode a session starts in when the host has not picked one.
+pub const DEFAULT_MODE: &str = "ask";
+
+/// The connector's session modes in the composer's cycle order. The first
+/// entry is the primary mode: the mode a session starts in.
+pub const MODE_CHOICES: &[(&str, &str)] = &[
+    ("ask", "Ask"),
+    ("accept-edits", "Accept Edits"),
+    ("smart-approve", "Smart Approve"),
+    ("auto-approve", "Auto Approve"),
+];
+
+/// Host permission-mode wire id for a connector mode value. Values without
+/// a mapping are rejected by `session/set_config_option`.
+///
+/// See CadencR's `docs/PROVIDER_SPEC/PROVIDER_PACKAGE.md`, "Mode and
+/// access-mode selectors".
+pub fn host_permission_mode(value: &str) -> Option<&'static str> {
+    match value {
+        "ask" => Some("ask"),
+        "accept-edits" => Some("acceptEdits"),
+        "smart-approve" => Some("auto"),
+        "auto-approve" => Some("bypassPermissions"),
+        _ => None,
+    }
+}
 
 /// Discover model options for the workspace at `cwd`.
 pub fn discover_model_options(
@@ -41,7 +73,7 @@ async fn discover_inner(
     provider_args: &[String],
 ) -> Result<Vec<SessionConfigOption>, String> {
     let rpc = spawn(cwd, None, true, provider_args)?;
-    let options = load_config_options(&rpc).await;
+    let options = load_config_options(&rpc, DEFAULT_MODE).await;
     rpc.shutdown().await;
     options
 }
@@ -49,7 +81,10 @@ async fn discover_inner(
 /// Query pi for models, state and the current model's thinking levels, and
 /// build the ACP config options. Single source of truth for `models`
 /// discovery and for live `session/new|resume|set_config_option`.
-pub async fn load_config_options(rpc: &PiRpc) -> Result<Vec<SessionConfigOption>, String> {
+pub async fn load_config_options(
+    rpc: &PiRpc,
+    mode: &str,
+) -> Result<Vec<SessionConfigOption>, String> {
     let mut models = rpc.get_available_models().await?;
     if models.is_empty() {
         return Err(
@@ -61,7 +96,7 @@ pub async fn load_config_options(rpc: &PiRpc) -> Result<Vec<SessionConfigOption>
     let state = rpc.get_state().await?;
     let levels = rpc.get_available_thinking_levels().await?;
     apply_thinking_levels(&mut models, &state, levels);
-    Ok(build_session_config_options(&models, Some(&state)))
+    Ok(build_session_config_options(&models, Some(&state), mode))
 }
 
 /// Attach the thinking levels to the model they were fetched for (the
@@ -76,13 +111,15 @@ fn apply_thinking_levels(models: &mut [PiModel], state: &PiState, levels: Vec<St
     }
 }
 
-/// Build the full set of session config options from Pi models and state.
+/// Build the full set of session config options from Pi models, state and
+/// the session's permission mode.
 ///
 /// This is the single source of truth used by both `models` discovery and
 /// live `session/new` / `session/resume` responses.
 pub fn build_session_config_options(
     models: &[PiModel],
     state: Option<&PiState>,
+    mode: &str,
 ) -> Vec<SessionConfigOption> {
     let current_model_id = state
         .and_then(|s| s.model.as_ref())
@@ -90,7 +127,8 @@ pub fn build_session_config_options(
         .unwrap_or_else(|| models[0].acp_model_id());
 
     let model_option = build_model_option(models, &current_model_id);
-    let mut options = vec![model_option];
+    let mode_option = build_mode_option(mode);
+    let mut options = vec![model_option, mode_option];
 
     // Add thinking level option if any model supports multiple levels.
     if let Some(thinking_option) = build_thinking_option(models, state) {
@@ -98,6 +136,45 @@ pub fn build_session_config_options(
     }
 
     options
+}
+
+/// Build the `mode` select option, annotating each choice with
+/// `_meta.cadencr.permissionMode` so CadencR maps its permission-mode chip
+/// onto the connector's modes and pushes the selected mode back to the live
+/// session through `session/set_config_option`.
+pub fn build_mode_option(current: &str) -> SessionConfigOption {
+    let choices: Vec<SessionConfigSelectOption> = MODE_CHOICES
+        .iter()
+        .map(|(value, name)| {
+            let mut option = SessionConfigSelectOption::new(*value, *name);
+            if let Some(host_id) = host_permission_mode(value) {
+                let mut cadencr = serde_json::Map::new();
+                cadencr.insert(
+                    "permissionMode".to_string(),
+                    Value::String(host_id.to_string()),
+                );
+                let mut meta = serde_json::Map::new();
+                meta.insert("cadencr".to_string(), Value::Object(cadencr));
+                option = option.meta(meta);
+            }
+            option
+        })
+        .collect();
+
+    let current = if MODE_CHOICES.iter().any(|(value, _)| *value == current) {
+        current
+    } else {
+        DEFAULT_MODE
+    };
+
+    SessionConfigOption::select(
+        MODE_OPTION_ID,
+        "Mode",
+        SessionConfigValueId::new(current),
+        SessionConfigSelectOptions::Ungrouped(choices),
+    )
+    .description("Select the permission mode for this session")
+    .category(SessionConfigOptionCategory::Mode)
 }
 
 /// Build the `model` select option from Pi's available models.
@@ -341,5 +418,68 @@ mod tests {
         assert_eq!(capitalize("low"), "Low");
         assert_eq!(capitalize("max"), "Max");
         assert_eq!(capitalize(""), "");
+    }
+
+    #[test]
+    fn known_modes_map_to_host_permission_ids() {
+        assert_eq!(host_permission_mode("ask"), Some("ask"));
+        assert_eq!(host_permission_mode("accept-edits"), Some("acceptEdits"));
+        assert_eq!(host_permission_mode("smart-approve"), Some("auto"));
+        assert_eq!(
+            host_permission_mode("auto-approve"),
+            Some("bypassPermissions")
+        );
+        assert_eq!(host_permission_mode("something-else"), None);
+    }
+
+    #[test]
+    fn mode_option_carries_host_permission_mode_annotations() {
+        let option = build_mode_option(DEFAULT_MODE);
+        assert_eq!(&*option.id.0, MODE_OPTION_ID);
+        assert_eq!(option.category, Some(SessionConfigOptionCategory::Mode));
+        let json = serde_json::to_value(&option).unwrap();
+        assert_eq!(json["type"], "select");
+        assert_eq!(json["currentValue"], "ask");
+        let choices = json["options"].as_array().unwrap();
+        assert_eq!(choices.len(), MODE_CHOICES.len());
+        let mapping = |value: &str| {
+            choices
+                .iter()
+                .find(|choice| choice["value"] == value)
+                .and_then(|choice| choice.pointer("/_meta/cadencr/permissionMode"))
+                .and_then(Value::as_str)
+        };
+        assert_eq!(mapping("ask"), Some("ask"));
+        assert_eq!(mapping("accept-edits"), Some("acceptEdits"));
+        assert_eq!(mapping("smart-approve"), Some("auto"));
+        assert_eq!(mapping("auto-approve"), Some("bypassPermissions"));
+    }
+
+    #[test]
+    fn mode_option_reflects_the_session_mode() {
+        let option = build_mode_option("auto-approve");
+        let json = serde_json::to_value(&option).unwrap();
+        assert_eq!(json["currentValue"], "auto-approve");
+    }
+
+    #[test]
+    fn unknown_mode_falls_back_to_the_default() {
+        let option = build_mode_option("bogus");
+        let json = serde_json::to_value(&option).unwrap();
+        assert_eq!(json["currentValue"], DEFAULT_MODE);
+    }
+
+    #[test]
+    fn session_config_options_include_the_mode_selector() {
+        let models = sample_models();
+        let options = build_session_config_options(&models, None, "smart-approve");
+        let mode = options
+            .iter()
+            .find(|option| &*option.id.0 == MODE_OPTION_ID)
+            .expect("mode option");
+        let json = serde_json::to_value(mode).unwrap();
+        assert_eq!(json["category"], "mode");
+        assert_eq!(json["currentValue"], "smart-approve");
+        assert!(options.iter().any(|option| &*option.id.0 == "model"));
     }
 }

@@ -6,7 +6,9 @@
 //!
 //! `models` launches `pi --mode rpc --no-session --no-approve` in the
 //! requested workspace, calls `get_available_models` and `get_state`,
-//! and emits the ACP v1 `SessionConfigOption` array.
+//! and emits the ACP v1 `SessionConfigOption` array: the `model` selector,
+//! a `mode` selector whose choices carry `_meta.cadencr.permissionMode`
+//! host mappings, and an optional `thinking` selector.
 //!
 //! `run` starts an ACP v1 JSON-RPC server over stdio. Each ACP session
 //! owns a persistent `pi --mode rpc` child process; the connector bridges

@@ -1,3 +1,17 @@
+## Pi 0.6.0
+
+- Declare a `mode` selector (ACP category `mode`) in the `models` output and
+  in every live session, with each choice annotated
+  `_meta.cadencr.permissionMode` (`ask` → `ask`, `accept-edits` →
+  `acceptEdits`, `smart-approve` → `auto`, `auto-approve` →
+  `bypassPermissions`), mirroring the Mistral Vibe connector. CadencR maps
+  its permission-mode chip onto these values and applies the selected mode
+  to the live session through `session/set_config_option`.
+- In `ask` mode, extension `confirm`/`select` dialogs are bridged to ACP
+  `session/request_permission` as before. In every other mode the connector
+  answers them itself (confirm → yes, select → first option), so
+  auto-approve no longer prompts on every dialog.
+
 ## Pi 0.5.0
 
 - Register the connector under the `pi` provider ID with display name **Pi**
