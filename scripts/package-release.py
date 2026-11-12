@@ -44,6 +44,8 @@ def identity():
     for key in ("id", "name", "version", "repository", "license"):
         if package["agent"][key] != descriptor["agent"][key]:
             raise ValueError(f"Descriptor and marketplace identity differ: {key}")
+    if descriptor["agent"].get("icon") != package["host"]["assets"]["icon"]:
+        raise ValueError("Descriptor and marketplace icons differ")
     if package["agent"]["version"] != version:
         raise ValueError("Cargo and marketplace versions differ")
     return package, descriptor
@@ -59,7 +61,7 @@ def prepare(args):
     (stage / "bin").mkdir(parents=True)
     shutil.copyfile(binary, stage / "bin/provider")
     (stage / "bin/provider").chmod(0o755)
-    for name in ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "icon.svg"):
+    for name in ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "icon.svg", "pi-logo.svg"):
         shutil.copyfile(ROOT / name, stage / name)
         (stage / name).chmod(0o644)
     descriptor["installation"]["executable"] = {"command": str(stage / "bin/provider")}

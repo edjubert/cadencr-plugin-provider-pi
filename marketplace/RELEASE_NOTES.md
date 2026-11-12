@@ -1,3 +1,13 @@
+## Pi 0.6.1
+
+- Use the official Pi artwork (`pi-logo.svg`) as the marketplace provider icon,
+  matching local installations. The previous opaque connector illustration
+  appeared as a disk in CadencR's monochrome conversation badges.
+- Include the official logo in every platform archive while retaining
+  `icon.svg` for the README illustration.
+- Reject packaging when the local descriptor and marketplace icon paths
+  differ.
+
 ## Pi 0.6.0
 
 - Declare a `mode` selector (ACP category `mode`) in the `models` output and

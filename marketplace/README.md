@@ -1,6 +1,6 @@
 # Marketplace release
 
-This repository's marketplace candidate is **0.6.0**, compatible with
+This repository's marketplace candidate is **0.6.1**, compatible with
 **CadencR >=0.16.0**. Its provider ID is `pi`, display name is **Pi**
 and publisher is `edjubert`.
 The `pi` provider namespace was handed over to this connector by the registry
@@ -11,13 +11,17 @@ so the candidate registers as `pi`.
 The [Pi v0.6.0 release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.6.0)
 is published with a signed tag and GitHub's server-side `immutable: true`.
 All eight public assets match the qualified CI bundle byte-for-byte.
-The admission request is the registry pull request for `pi 0.6.0` (it
-supersedes PR #22, which carried the `0.5.0` candidate). Marketplace
+Version `0.6.1` corrects the marketplace provider artwork. Its marketplace
 availability requires maintainer acceptance and signed catalog publication.
-See [qualification results](QA.md).
+The [qualification report](QA.md) records the earlier `0.5.0` release;
+each new release publishes its own `native-qa.json` evidence.
 
 The package template is an authoring input. Its empty platform map is filled
 only by the packaging script; it is not installable metadata.
+
+The provider icon is the official Pi artwork in `pi-logo.svg`, shared with the
+local descriptor. Archives also retain `icon.svg` for the README illustration.
+Packaging rejects a mismatch between the local and marketplace icon paths.
 
 ## Prepare and qualify
 
@@ -65,7 +69,7 @@ under the system temporary directory.
    `package.json`, `submission.json`, `SHA256SUMS`, native QA evidence and notes.
    Confirm that the submission pins the exact tested source commit.
 3. Ensure GitHub immutable releases are enabled for the author repository.
-   Tag that commit as `v0.6.0` and push the tag. After publication authorization,
+   Tag that commit as `v0.6.1` and push the tag. After publication authorization,
    either publish the reviewed bundle with `gh release create --verify-tag --draft`,
    upload all assets and publish the draft with `gh release edit --draft=false`,
    or dispatch the same tag with `publish` checked to qualify and publish a new
@@ -77,8 +81,8 @@ under the system temporary directory.
 5. In a personal fork of `merkr-software/cadencr-registry`, add:
 
    ```text
-   packages/pi-0.6.0.json      ← package.json
-   submissions/pi-0.6.0.json   ← submission.json
+   packages/pi-0.6.1.json      ← package.json
+   submissions/pi-0.6.1.json   ← submission.json
    ```
 
 6. Run `cadencr registry validate --base <accepted-registry> --candidate <fork>`,

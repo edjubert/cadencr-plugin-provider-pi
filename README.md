@@ -72,14 +72,16 @@ The repository's GitHub Actions workflow produces the reviewable release bundle;
 publishing the author release and accepting the registry contribution are
 separate steps.
 
-The [Pi v0.5.0 release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.5.0)
+The [Pi v0.6.0 release](https://github.com/edjubert/cadencr-plugin-provider-pi/releases/tag/v0.6.0)
 is published with immutable assets and a signed tag. It registers under the
 `pi` identity in marketplace metadata and ACP while retaining existing
 workspace-bound session IDs.
 All four native targets (macOS and Linux on Intel/x86-64 and arm64) passed
-[release qualification](https://github.com/edjubert/cadencr-plugin-provider-pi/actions/runs/41814529310).
-[Registry PR #22](https://github.com/merkr-software/cadencr-registry/pull/22)
-is awaiting maintainer acceptance before marketplace listing.
+[release qualification](https://github.com/edjubert/cadencr-plugin-provider-pi/actions/runs/42712168584).
+
+Version `0.6.1` packages the official Pi logo for marketplace installations,
+matching the local descriptor. See the [release notes](marketplace/RELEASE_NOTES.md).
+Each marketplace update requires registry acceptance and signed catalog publication.
 
 ## Local Cadencr install
 
@@ -103,7 +105,8 @@ Add an `env` block to the descriptor's `installation.executable`:
 To install from another directory, keep `installation.executable.command`
 pointing at the release binary and `installation.assets.directory` at this
 repository root. It contains `pi-logo.svg` for Cadencr and `icon.svg` for this
-README.
+README. Marketplace archives include both files and declare `pi-logo.svg` as
+the provider icon, matching the local descriptor.
 
 ### Cadencr development checkout
 
